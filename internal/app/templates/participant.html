@@ -1,0 +1,207 @@
+{{define "participant.html"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>HAMAL · Participant Connection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/site.css">
+  <script>
+    (function() {
+      var saved = localStorage.getItem('hamal_theme');
+      var prefDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var theme = saved || (prefDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+  <script defer src="/static/site.js"></script>
+</head>
+<body data-page="participant" data-token="{{.ParticipantToken}}" data-expires="{{.ExpiresAtRFC3339}}" data-pin-required="{{.PinRequired}}" data-pin-authenticated="{{.PinAuthenticated}}" data-is-locked="{{.IsLocked}}" data-retry-after="{{.RetryAfterSeconds}}">
+  <div class="app-container" style="max-width: 760px;">
+    <!-- Header Navigation -->
+    <header class="header-nav">
+      <a href="/" class="brand-wrapper" title="HAMAL">
+        <img src="/static/brand/hamal-logo-light.svg" alt="HAMAL" class="brand-logo logo-light">
+        <img src="/static/brand/hamal-logo-dark.svg" alt="HAMAL" class="brand-logo logo-dark">
+        <span class="header-tag">PARTICIPANT</span>
+      </a>
+
+      <div class="header-meta">
+        <button type="button" id="theme-toggle-btn" class="theme-toggle-btn" aria-label="Toggle Light / Dark Theme" title="Toggle theme">
+          <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2"></path>
+            <path d="M12 20v2"></path>
+            <path d="m4.93 4.93 1.41 1.41"></path>
+            <path d="m17.66 17.66 1.41 1.41"></path>
+            <path d="M2 12h2"></path>
+            <path d="M20 12h2"></path>
+            <path d="m6.34 17.66-1.41 1.41"></path>
+            <path d="m19.07 4.93-1.41 1.41"></path>
+          </svg>
+          <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="content-column">
+      <!-- PIN Entry Card (Shown if PIN is required and not yet authenticated) -->
+      <section id="room-pin-card" class="card" style="{{if not (and .PinRequired (not .PinAuthenticated))}}display: none;{{end}}">
+        <div class="card-header" style="text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
+          <div style="width: 56px; height: 56px; border-radius: var(--radius-full); background: var(--accent-amber-glow); border: 1px solid var(--accent-amber-border); display: flex; align-items: center; justify-content: center; margin-bottom: 0.875rem; color: var(--accent-amber);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </div>
+          <h2 class="card-title" style="font-size: 1.25rem;">PIN Protected Room</h2>
+          <p class="card-subtitle">Enter the PIN code provided by the room creator to gain access.</p>
+        </div>
+
+        <form id="pin-form" method="POST" action="/api/v1/rooms/{{.ParticipantToken}}/auth/pin">
+          <div class="form-group" style="margin-bottom: 1.25rem;">
+            <label for="participant-pin-input" class="field-label">Room PIN</label>
+            <input type="password" id="participant-pin-input" name="pin" maxlength="8" inputmode="numeric" placeholder="Enter PIN" autocomplete="off" required class="form-input" style="text-align: center; font-family: var(--font-mono); font-size: 1.25rem; letter-spacing: 0.25em;">
+          </div>
+
+          <button type="submit" id="unlock-btn" class="btn btn-primary" style="width: 100%; padding: 0.875rem 1.5rem; font-size: 1rem;">Unlock Room</button>
+        </form>
+
+        <div id="pin-error" class="error-msg" style="display: none; margin-top: 1rem;"></div>
+        <div id="pin-cooldown" class="alert-box alert-warning" style="{{if not .IsLocked}}display: none;{{end}} margin-top: 1rem;">
+          <span id="pin-cooldown-text">Too many failed attempts. Cooldown active.</span>
+        </div>
+      </section>
+
+      <!-- Active Participant Room Section -->
+      <section id="room-active-card" class="content-column" style="{{if and .PinRequired (not .PinAuthenticated)}}display: none;{{end}}">
+        <!-- Room Status Bar -->
+        <div class="card" style="padding: 1.25rem 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <div class="badge-row" style="margin-bottom: 0.375rem;">
+                <span id="status-badge" class="badge badge-active">
+                  <span class="badge-dot"></span>ROOM ACTIVE
+                </span>
+                {{if .PinRequired}}<span class="badge badge-pin">PIN Verified</span>{{end}}
+              </div>
+              <p class="card-subtitle" style="margin: 0;">Connected to peer transfer room</p>
+            </div>
+
+            <div class="room-status-box" style="padding: 0.5rem 1rem; border-radius: var(--radius-md);">
+              <div class="status-label-group" style="align-items: flex-end;">
+                <span class="status-caption">Expires in</span>
+                <span id="countdown" class="countdown-timer" style="font-size: 1.375rem;">Calculating…</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upload Dropzone Card -->
+        <div class="card">
+          <div id="dropzone" class="dropzone">
+            <svg class="dropzone-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            <p id="dropzone-title" class="dropzone-title">Drag & drop files here</p>
+            <p class="dropzone-hint">or <label for="file-input" class="browse-link">click to browse</label></p>
+            <input type="file" id="file-input" multiple style="display: none;">
+          </div>
+
+          <div id="upload-progress-container" class="upload-progress-container" style="display: none;">
+            <div class="progress-info">
+              <span id="upload-filename" class="upload-filename">Uploading file…</span>
+              <span id="upload-percent" class="upload-percent">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+            </div>
+            <div id="upload-error" class="error-msg" style="display: none;"></div>
+          </div>
+        </div>
+
+        <!-- Room Files Card -->
+        <div class="card">
+          <div class="files-header">
+            <div class="files-title-group">
+              <h3 class="files-title">Files in Room</h3>
+              <span id="file-count" class="count-pill">{{len .Files}}</span>
+            </div>
+          </div>
+
+          <div id="file-list" class="file-list">
+            {{if .Files}}
+              {{range .Files}}
+              <div class="file-item" data-file-id="{{.ID}}">
+                <div class="file-item-main">
+                  <div class="file-type-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                  </div>
+                  <div class="file-info">
+                    <span class="file-name" title="{{.OriginalFilename}}">{{.OriginalFilename}}</span>
+                    <span class="file-meta font-mono">{{.SizeBytes}} bytes <span class="meta-separator">·</span> {{.ContentType}}</span>
+                  </div>
+                </div>
+                <div class="file-actions">
+                  <a href="/api/v1/rooms/{{$.ParticipantToken}}/files/{{.ID}}" download="{{.OriginalFilename}}" class="btn btn-secondary btn-sm btn-download">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Download
+                  </a>
+                </div>
+              </div>
+              {{end}}
+            {{else}}
+              <div id="no-files-msg" class="empty-state">
+                <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+                <p class="empty-state-title">No files uploaded yet</p>
+                <p class="empty-state-text">Files uploaded by anyone in this room will appear here in real time for immediate download.</p>
+              </div>
+            {{end}}
+          </div>
+        </div>
+      </section>
+
+      <!-- Inactive Room State -->
+      <section id="room-inactive-card" class="card card-inactive" style="display: none;">
+        <div class="inactive-icon-wrapper">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>
+        <h2 id="inactive-title" class="inactive-title">Room Inactive</h2>
+        <p id="inactive-message" class="inactive-message">This temporary room has expired or was closed by the creator.</p>
+        <div>
+          <a href="/" class="btn btn-primary">Create a New Room</a>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <p>© {{.Year}} HAMAL · Courier File Transfer · Private & Temporary</p>
+    </footer>
+  </div>
+</body>
+</html>
+{{end}}

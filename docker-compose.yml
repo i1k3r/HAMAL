@@ -1,0 +1,20 @@
+services:
+  lan-drop:
+    build: .
+    image: ghcr.io/i1k3r/lan-drop:latest
+    container_name: lan-drop
+    ports:
+      - "7700:7700"
+    env_file:
+      - .env
+    volumes:
+      - lan-drop-data:/data
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  lan-drop-data:

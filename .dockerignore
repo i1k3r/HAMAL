@@ -1,0 +1,15 @@
+.git
+.github
+.gitignore
+work
+outputs
+*.exe
+*.db
+*.db-wal
+*.db-shm
+data
+README.md
+ARCHITECTURE.md
+SECURITY.md
+CONTRIBUTING.md
+unraid-template.xml
