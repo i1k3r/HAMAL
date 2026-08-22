@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/i1k3r/lan-drop/internal/config"
-	"github.com/i1k3r/lan-drop/internal/file"
+	"github.com/i1k3r/HAMAL/internal/config"
+	"github.com/i1k3r/HAMAL/internal/file"
 )
 
 func testApp(t *testing.T) *App {

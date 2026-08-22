@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/i1k3r/lan-drop/internal/database"
-	"github.com/i1k3r/lan-drop/internal/file"
-	"github.com/i1k3r/lan-drop/internal/room"
-	"github.com/i1k3r/lan-drop/internal/share"
-	"github.com/i1k3r/lan-drop/internal/storage"
+	"github.com/i1k3r/HAMAL/internal/database"
+	"github.com/i1k3r/HAMAL/internal/file"
+	"github.com/i1k3r/HAMAL/internal/room"
+	"github.com/i1k3r/HAMAL/internal/share"
+	"github.com/i1k3r/HAMAL/internal/storage"
 )
 
 type testHarness struct {

@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/i1k3r/lan-drop/internal/app"
-	"github.com/i1k3r/lan-drop/internal/config"
+	"github.com/i1k3r/HAMAL/internal/app"
+	"github.com/i1k3r/HAMAL/internal/config"
 )
 
 func main() {

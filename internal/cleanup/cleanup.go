@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/i1k3r/lan-drop/internal/storage"
+	"github.com/i1k3r/HAMAL/internal/storage"
 )
 
 type Options struct {

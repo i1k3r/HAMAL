@@ -13,7 +13,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/i1k3r/lan-drop/internal/file"
+	"github.com/i1k3r/HAMAL/internal/file"
 )
 
 var (

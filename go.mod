@@ -1,4 +1,4 @@
-module github.com/i1k3r/lan-drop
+module github.com/i1k3r/HAMAL
 
 go 1.23.0
 

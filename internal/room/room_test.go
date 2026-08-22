@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/i1k3r/lan-drop/internal/database"
+	"github.com/i1k3r/HAMAL/internal/database"
 )
 
 func setupTestStore(t *testing.T) (*Store, string) {
