@@ -2679,3 +2679,205 @@ func TestHSTSConditionallySentOnHTTPS(t *testing.T) {
 		t.Fatalf("expected HSTS %q on HTTPS, got %q", expectedHSTS, hsts)
 	}
 }
+
+func TestCookiePlainLANHTTP(t *testing.T) {
+	cfg := config.Default()
+	cfg.SecureCookies = "auto"
+	a := testAppWithConfig(t, cfg)
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	// 1. Create a room with PIN
+	createReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600, "pin": "9999"}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := http.DefaultClient.Do(createReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	// 2. Submit PIN over plain HTTP
+	authReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/auth/pin", strings.NewReader(`{"pin": "9999"}`))
+	authReq.Header.Set("Content-Type", "application/json")
+	authResp, err := http.DefaultClient.Do(authReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer authResp.Body.Close()
+
+	var sessionCookie *http.Cookie
+	for _, c := range authResp.Cookies() {
+		if strings.HasPrefix(c.Name, "landrop_session_") {
+			sessionCookie = c
+			break
+		}
+	}
+
+	if sessionCookie == nil {
+		t.Fatal("expected session cookie in response")
+	}
+
+	// Verify all hardened attributes
+	if !sessionCookie.HttpOnly {
+		t.Errorf("expected HttpOnly=true, got false")
+	}
+	if sessionCookie.Secure {
+		t.Errorf("expected Secure=false on plain LAN HTTP, got true")
+	}
+	if sessionCookie.SameSite != http.SameSiteLaxMode {
+		t.Errorf("expected SameSite=Lax, got %v", sessionCookie.SameSite)
+	}
+	if sessionCookie.Path != "/" {
+		t.Errorf("expected Path=/, got %q", sessionCookie.Path)
+	}
+	if sessionCookie.Domain != "" {
+		t.Errorf("expected host-only cookie (empty Domain), got %q", sessionCookie.Domain)
+	}
+	if sessionCookie.MaxAge <= 0 || sessionCookie.MaxAge > 3600 {
+		t.Errorf("expected MaxAge around 3600 seconds, got %d", sessionCookie.MaxAge)
+	}
+}
+
+func TestCookieExplicitConfigOverride(t *testing.T) {
+	// Case A: SecureCookies = "true" forces Secure=true even on plain HTTP
+	cfgTrue := config.Default()
+	cfgTrue.SecureCookies = "true"
+	aTrue := testAppWithConfig(t, cfgTrue)
+	tsTrue := httptest.NewServer(aTrue.Handler())
+	defer tsTrue.Close()
+
+	cReq, _ := http.NewRequest(http.MethodPost, tsTrue.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600, "pin": "5555"}`))
+	cReq.Header.Set("Content-Type", "application/json")
+	cResp, err := http.DefaultClient.Do(cReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(cResp.Body).Decode(&rData)
+	cResp.Body.Close()
+
+	aReq, _ := http.NewRequest(http.MethodPost, tsTrue.URL+"/api/v1/rooms/"+rData.ParticipantToken+"/auth/pin", strings.NewReader(`{"pin": "5555"}`))
+	aReq.Header.Set("Content-Type", "application/json")
+	aResp, err := http.DefaultClient.Do(aReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer aResp.Body.Close()
+
+	for _, c := range aResp.Cookies() {
+		if strings.HasPrefix(c.Name, "landrop_session_") {
+			if !c.Secure {
+				t.Errorf("expected Secure=true when SecureCookies=true, got false")
+			}
+		}
+	}
+
+	// Case B: SecureCookies = "false" forces Secure=false even when X-Forwarded-Proto: https
+	cfgFalse := config.Default()
+	cfgFalse.SecureCookies = "false"
+	cfgFalse.TrustedProxies = []string{"127.0.0.1/32", "::1/128"}
+	aFalse := testAppWithConfig(t, cfgFalse)
+	tsFalse := httptest.NewServer(aFalse.Handler())
+	defer tsFalse.Close()
+
+	cReq2, _ := http.NewRequest(http.MethodPost, tsFalse.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600, "pin": "5555"}`))
+	cReq2.Header.Set("Content-Type", "application/json")
+	cResp2, err := http.DefaultClient.Do(cReq2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rData2 struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(cResp2.Body).Decode(&rData2)
+	cResp2.Body.Close()
+
+	aReq2, _ := http.NewRequest(http.MethodPost, tsFalse.URL+"/api/v1/rooms/"+rData2.ParticipantToken+"/auth/pin", strings.NewReader(`{"pin": "5555"}`))
+	aReq2.Header.Set("Content-Type", "application/json")
+	aReq2.Header.Set("X-Forwarded-Proto", "https")
+	aResp2, err := http.DefaultClient.Do(aReq2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer aResp2.Body.Close()
+
+	for _, c := range aResp2.Cookies() {
+		if strings.HasPrefix(c.Name, "landrop_session_") {
+			if c.Secure {
+				t.Errorf("expected Secure=false when SecureCookies=false, got true")
+			}
+		}
+	}
+}
+
+func TestParticipantAuthenticationWithHardenedCookie(t *testing.T) {
+	a := testApp(t)
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	// 1. Create PIN-protected room
+	createReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600, "pin": "7777"}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := http.DefaultClient.Do(createReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	// 2. Query file list without cookie -> 401 Unauthorized
+	filesReq, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", nil)
+	filesResp, err := http.DefaultClient.Do(filesReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	filesResp.Body.Close()
+	if filesResp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without PIN auth, got %d", filesResp.StatusCode)
+	}
+
+	// 3. Authenticate with PIN
+	pinReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/auth/pin", strings.NewReader(`{"pin": "7777"}`))
+	pinReq.Header.Set("Content-Type", "application/json")
+	pinResp, err := http.DefaultClient.Do(pinReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pinResp.Body.Close()
+	if pinResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 on PIN auth, got %d", pinResp.StatusCode)
+	}
+
+	var sessionCookie *http.Cookie
+	for _, c := range pinResp.Cookies() {
+		if strings.HasPrefix(c.Name, "landrop_session_") {
+			sessionCookie = c
+			break
+		}
+	}
+	if sessionCookie == nil {
+		t.Fatal("expected session cookie")
+	}
+
+	// 4. Query file list WITH session cookie -> 200 OK
+	filesReqAuth, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", nil)
+	filesReqAuth.AddCookie(sessionCookie)
+	filesRespAuth, err := http.DefaultClient.Do(filesReqAuth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer filesRespAuth.Body.Close()
+	if filesRespAuth.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 with session cookie, got %d", filesRespAuth.StatusCode)
+	}
+}

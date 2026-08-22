@@ -656,6 +656,11 @@ func (a *App) routes() (http.Handler, error) {
 			return
 		}
 
+		maxAge := int(time.Until(rm.ExpiresAt).Seconds())
+		if maxAge < 0 {
+			maxAge = 0
+		}
+
 		http.SetCookie(w, &http.Cookie{
 			Name:     "landrop_session_" + rm.ID,
 			Value:    sessionToken,
@@ -664,6 +669,7 @@ func (a *App) routes() (http.Handler, error) {
 			Secure:   a.isHTTPS(r),
 			SameSite: http.SameSiteLaxMode,
 			Expires:  rm.ExpiresAt,
+			MaxAge:   maxAge,
 		})
 
 		w.Header().Set("Content-Type", "application/json")
