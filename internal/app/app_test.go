@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/i1k3r/lan-drop/internal/config"
 	"github.com/i1k3r/lan-drop/internal/file"
@@ -1784,4 +1785,449 @@ func TestRateLimiterRaceSafety(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+func TestUploadIdleTimeoutExceeded(t *testing.T) {
+	cfg := config.Default()
+	cfg.UploadIdleTimeout = 150 * time.Millisecond
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	createReq, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := http.DefaultClient.Do(createReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+
+	go func() {
+		part, err := writer.CreateFormFile("file", "stalled.bin")
+		if err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+		_, _ = part.Write([]byte("initial chunk"))
+		time.Sleep(400 * time.Millisecond) // Stalls beyond 150ms timeout
+		_, _ = part.Write([]byte("second chunk that should trigger timeout"))
+		_ = writer.Close()
+		_ = pw.Close()
+	}()
+
+	upReq, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", pr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	upReq.Header.Set("Content-Type", writer.FormDataContentType())
+
+	upResp, err := http.DefaultClient.Do(upReq)
+	if err == nil {
+		defer upResp.Body.Close()
+		if upResp.StatusCode != http.StatusRequestTimeout && upResp.StatusCode != http.StatusInternalServerError && upResp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected timeout error status (408 or failure), got %d", upResp.StatusCode)
+		}
+	}
+}
+
+func TestContinuousSlowUploadDoesNotTimeout(t *testing.T) {
+	cfg := config.Default()
+	cfg.UploadIdleTimeout = 150 * time.Millisecond
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	createReq, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := http.DefaultClient.Do(createReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+
+	// Send 5 chunks with 50ms pause between each chunk.
+	// Total duration = 5 * 50ms = 250ms (> 150ms timeout).
+	// Because each chunk arrives within 50ms (< 150ms), the upload MUST succeed!
+	go func() {
+		part, err := writer.CreateFormFile("file", "continuous.txt")
+		if err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+		for i := 0; i < 5; i++ {
+			time.Sleep(50 * time.Millisecond)
+			_, _ = part.Write([]byte(fmt.Sprintf("chunk-%d\n", i)))
+		}
+		_ = writer.Close()
+		_ = pw.Close()
+	}()
+
+	upReq, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", pr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	upReq.Header.Set("Content-Type", writer.FormDataContentType())
+
+	upResp, err := http.DefaultClient.Do(upReq)
+	if err != nil {
+		t.Fatalf("continuous upload failed: %v", err)
+	}
+	defer upResp.Body.Close()
+
+	if upResp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(upResp.Body)
+		t.Fatalf("expected 201 Created for continuous upload, got %d: %s", upResp.StatusCode, string(body))
+	}
+}
+
+func TestUploadTimeoutReleasesQuotaReservation(t *testing.T) {
+	cfg := config.Default()
+	cfg.UploadIdleTimeout = 100 * time.Millisecond
+	cfg.MinFreeSpace = 0
+	cfg.MaxRoomSize = 100 * 1024 // 100 KB max room size
+	a := testAppWithConfig(t, cfg)
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	createReq, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := http.DefaultClient.Do(createReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	// Stalled upload of 80 KB
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+	go func() {
+		part, _ := writer.CreateFormFile("file", "stall.bin")
+		_, _ = part.Write(bytes.Repeat([]byte("A"), 1024))
+		time.Sleep(300 * time.Millisecond) // stall beyond 100ms
+		_ = writer.Close()
+		_ = pw.Close()
+	}()
+
+	upReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", pr)
+	upReq.Header.Set("Content-Type", writer.FormDataContentType())
+	upResp, _ := http.DefaultClient.Do(upReq)
+	if upResp != nil {
+		_ = upResp.Body.Close()
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Now upload 80 KB normally -> must succeed because previous in-flight reservation was released
+	body := &bytes.Buffer{}
+	w2 := multipart.NewWriter(body)
+	p2, _ := w2.CreateFormFile("file", "success.bin")
+	_, _ = p2.Write(bytes.Repeat([]byte("B"), 80*1024))
+	_ = w2.Close()
+
+	upReq2, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", body)
+	upReq2.Header.Set("Content-Type", w2.FormDataContentType())
+	upResp2, err := http.DefaultClient.Do(upReq2)
+	if err != nil {
+		t.Fatalf("subsequent upload failed: %v", err)
+	}
+	defer upResp2.Body.Close()
+
+	if upResp2.StatusCode != http.StatusCreated {
+		respBytes, _ := io.ReadAll(upResp2.Body)
+		t.Fatalf("expected 201 Created after timeout released reservation, got %d: %s", upResp2.StatusCode, string(respBytes))
+	}
+}
+
+func TestUploadTimeoutDeletesStagingFile(t *testing.T) {
+	cfg := config.Default()
+	cfg.UploadIdleTimeout = 100 * time.Millisecond
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	createReq, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := http.DefaultClient.Do(createReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+	go func() {
+		part, _ := writer.CreateFormFile("file", "stall.bin")
+		_, _ = part.Write([]byte("staging cleanup test"))
+		time.Sleep(300 * time.Millisecond) // stall
+		_ = writer.Close()
+		_ = pw.Close()
+	}()
+
+	upReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", pr)
+	upReq.Header.Set("Content-Type", writer.FormDataContentType())
+	upResp, _ := http.DefaultClient.Do(upReq)
+	if upResp != nil {
+		_ = upResp.Body.Close()
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	entries, err := os.ReadDir(a.paths.StagingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected 0 files in staging directory after timeout, found %d", len(entries))
+	}
+}
+
+func TestUploadClientDisconnectCleanup(t *testing.T) {
+	cfg := config.Default()
+	cfg.UploadIdleTimeout = 5 * time.Second
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	createReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, _ := http.DefaultClient.Do(createReq)
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+	go func() {
+		part, _ := writer.CreateFormFile("file", "disconnect.bin")
+		_, _ = part.Write([]byte("data before disconnect"))
+		time.Sleep(50 * time.Millisecond)
+		cancel() // Client abruptly cancels context
+		_ = pw.CloseWithError(context.Canceled)
+	}()
+
+	upReq, _ := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", pr)
+	upReq.Header.Set("Content-Type", writer.FormDataContentType())
+	upResp, _ := http.DefaultClient.Do(upReq)
+	if upResp != nil {
+		_ = upResp.Body.Close()
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	entries, err := os.ReadDir(a.paths.StagingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected 0 files in staging directory after client disconnect, found %d", len(entries))
+	}
+}
+
+func TestUploadIdleTimeoutDisabledWhenZero(t *testing.T) {
+	cfg := config.Default()
+	cfg.UploadIdleTimeout = 0 // Disabled
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	createReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, _ := http.DefaultClient.Do(createReq)
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+	go func() {
+		part, _ := writer.CreateFormFile("file", "zero_timeout.txt")
+		_, _ = part.Write([]byte("first chunk"))
+		time.Sleep(200 * time.Millisecond) // Slow pause
+		_, _ = part.Write([]byte("second chunk"))
+		_ = writer.Close()
+		_ = pw.Close()
+	}()
+
+	upReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", pr)
+	upReq.Header.Set("Content-Type", writer.FormDataContentType())
+	upResp, err := http.DefaultClient.Do(upReq)
+	if err != nil {
+		t.Fatalf("upload failed with disabled timeout: %v", err)
+	}
+	defer upResp.Body.Close()
+
+	if upResp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 Created when timeout is disabled, got %d", upResp.StatusCode)
+	}
+}
+
+func TestTimedOutUploadDoesNotBecomeReady(t *testing.T) {
+	cfg := config.Default()
+	cfg.UploadIdleTimeout = 100 * time.Millisecond
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	createReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, _ := http.DefaultClient.Do(createReq)
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+	go func() {
+		part, _ := writer.CreateFormFile("file", "unready.bin")
+		_, _ = part.Write([]byte("some data before stalling"))
+		time.Sleep(300 * time.Millisecond) // stall
+		_ = writer.Close()
+		_ = pw.Close()
+	}()
+
+	upReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", pr)
+	upReq.Header.Set("Content-Type", writer.FormDataContentType())
+	upResp, _ := http.DefaultClient.Do(upReq)
+	if upResp != nil {
+		_ = upResp.Body.Close()
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	// List files in room: must be 0 files and none ready
+	listReq, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", nil)
+	listResp, err := http.DefaultClient.Do(listReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listResp.Body.Close()
+
+	var listData struct {
+		Files     []file.File `json:"files"`
+		FileCount int         `json:"file_count"`
+	}
+	_ = json.NewDecoder(listResp.Body).Decode(&listData)
+	if listData.FileCount != 0 || len(listData.Files) != 0 {
+		t.Fatalf("expected 0 files in room after timed out upload, found %d", listData.FileCount)
+	}
+}
+
+func TestNormalLargeUploadStreamsSuccessfully(t *testing.T) {
+	cfg := config.Default()
+	cfg.UploadIdleTimeout = 500 * time.Millisecond
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	createReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, _ := http.DefaultClient.Do(createReq)
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+
+	// Stream 2 MB in 64 KB chunks
+	totalChunks := 32
+	chunkSize := 64 * 1024
+	go func() {
+		part, err := writer.CreateFormFile("file", "large_stream.bin")
+		if err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+		buf := bytes.Repeat([]byte("X"), chunkSize)
+		for i := 0; i < totalChunks; i++ {
+			_, err := part.Write(buf)
+			if err != nil {
+				pw.CloseWithError(err)
+				return
+			}
+		}
+		_ = writer.Close()
+		_ = pw.Close()
+	}()
+
+	upReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", pr)
+	upReq.Header.Set("Content-Type", writer.FormDataContentType())
+	upResp, err := http.DefaultClient.Do(upReq)
+	if err != nil {
+		t.Fatalf("large upload stream failed: %v", err)
+	}
+	defer upResp.Body.Close()
+
+	if upResp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(upResp.Body)
+		t.Fatalf("expected 201 Created for large stream upload, got %d: %s", upResp.StatusCode, string(body))
+	}
+
+	var fileData struct {
+		ID        string `json:"file_id"`
+		SizeBytes int64  `json:"size_bytes"`
+	}
+	_ = json.NewDecoder(upResp.Body).Decode(&fileData)
+	expectedSize := int64(totalChunks * chunkSize)
+	if fileData.SizeBytes != expectedSize {
+		t.Fatalf("expected size %d bytes, got %d", expectedSize, fileData.SizeBytes)
+	}
 }

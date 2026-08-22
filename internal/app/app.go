@@ -14,6 +14,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -196,6 +197,80 @@ func (a *App) checkRateLimit(w http.ResponseWriter, r *http.Request, limiter *IP
 		return false
 	}
 	return true
+}
+
+type idleTimeoutReader struct {
+	r       io.Reader
+	rc      *http.ResponseController
+	timeout time.Duration
+	useRC   bool
+}
+
+func newIdleTimeoutReader(r io.Reader, rc *http.ResponseController, timeout time.Duration) io.Reader {
+	itr := &idleTimeoutReader{
+		r:       r,
+		rc:      rc,
+		timeout: timeout,
+	}
+	if rc != nil && timeout > 0 {
+		if err := rc.SetReadDeadline(time.Now().Add(timeout)); err == nil {
+			itr.useRC = true
+		}
+	}
+	return itr
+}
+
+func (itr *idleTimeoutReader) Read(p []byte) (int, error) {
+	if itr.timeout <= 0 {
+		return itr.r.Read(p)
+	}
+
+	if itr.useRC {
+		_ = itr.rc.SetReadDeadline(time.Now().Add(itr.timeout))
+		n, err := itr.r.Read(p)
+		if err == io.EOF {
+			_ = itr.rc.SetReadDeadline(time.Time{})
+		} else if n > 0 {
+			_ = itr.rc.SetReadDeadline(time.Now().Add(itr.timeout))
+		}
+		return n, err
+	}
+
+	// Fallback for mocked readers or test recorders without socket ResponseController
+	type readResult struct {
+		n   int
+		err error
+	}
+	ch := make(chan readResult, 1)
+	go func() {
+		n, err := itr.r.Read(p)
+		ch <- readResult{n: n, err: err}
+	}()
+
+	timer := time.NewTimer(itr.timeout)
+	defer timer.Stop()
+
+	select {
+	case res := <-ch:
+		return res.n, res.err
+	case <-timer.C:
+		return 0, os.ErrDeadlineExceeded
+	}
+}
+
+func isTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, os.ErrDeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	errStr := strings.ToLower(err.Error())
+	return strings.Contains(errStr, "timeout") || strings.Contains(errStr, "deadline exceeded") || strings.Contains(errStr, "i/o timeout")
 }
 
 func (a *App) isHTTPS(r *http.Request) bool {
@@ -773,12 +848,22 @@ func (a *App) routes() (http.Handler, error) {
 					declaredSize = r.ContentLength
 				}
 
+				var bodyReader io.Reader = part
+				if a.cfg.UploadIdleTimeout > 0 {
+					rc := http.NewResponseController(w)
+					_ = rc.SetReadDeadline(time.Now().Add(a.cfg.UploadIdleTimeout))
+					defer func() {
+						_ = rc.SetReadDeadline(time.Time{})
+					}()
+					bodyReader = newIdleTimeoutReader(part, rc, a.cfg.UploadIdleTimeout)
+				}
+
 				uploaded, err := a.files.StreamUpload(
 					r.Context(),
 					rm.ID,
 					filename,
 					contentType,
-					part,
+					bodyReader,
 					declaredSize,
 					rm.MaxFileSize,
 					rm.MaxRoomSize,
@@ -795,6 +880,10 @@ func (a *App) routes() (http.Handler, error) {
 					}
 					if errors.Is(err, file.ErrFileTooLarge) || errors.Is(err, file.ErrQuotaExceeded) || errors.Is(err, file.ErrGlobalStorageExceeded) || errors.Is(err, file.ErrInsufficientStorage) {
 						writeJSONError(w, "file exceeds maximum size or storage quota", http.StatusRequestEntityTooLarge)
+						return
+					}
+					if isTimeoutError(err) {
+						writeJSONError(w, "upload timed out due to inactivity", http.StatusRequestTimeout)
 						return
 					}
 					a.logger.Error("failed to stream upload", "error", err)
