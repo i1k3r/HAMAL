@@ -319,7 +319,8 @@
       }
 
       fileListEl.innerHTML = '';
-      files.forEach((file) => {
+      const orderedFiles = [...files].reverse();
+      orderedFiles.forEach((file) => {
         const item = document.createElement('div');
         item.className = 'file-item';
         item.dataset.fileId = file.file_id;
