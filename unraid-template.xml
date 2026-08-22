@@ -9,6 +9,7 @@
   <Project>https://github.com/i1k3r/HAMAL</Project>
   <Overview>HAMAL — Point-to-point local file transfer. Fast, lightweight, private courier file sharing across local networks with QR code pairing, streaming multi-gigabyte transfers, optional PIN protection, background cleanup, and temporary Global Share links.</Overview>
   <Category>Tools: Productivity: Network:Web</Category>
+  <Icon>https://raw.githubusercontent.com/i1k3r/HAMAL/main/assets/hamal-icon.png</Icon>
   <WebUI>http://[IP]:[PORT:7700]</WebUI>
   <ExtraParams>--read-only --tmpfs /tmp --security-opt no-new-privileges:true</ExtraParams>
   <Networking>
