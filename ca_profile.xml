@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Maintainer>
+  <Icon>https://raw.githubusercontent.com/i1k3r/HAMAL/main/assets/hamal-icon.png</Icon>
+  <Profile>HAMAL is a lightweight, secure, and private point-to-point local network file transfer Docker application. It enables frictionless temporary file sharing across devices on the same network with QR code pairing, streaming transfers, optional PIN protection, automatic room expiry, and temporary Global Share links under the MIT license.</Profile>
+  <WebPage>https://github.com/i1k3r/HAMAL</WebPage>
+</Maintainer>
