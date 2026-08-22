@@ -39,18 +39,36 @@ type File struct {
 	CompletedAt      time.Time `json:"completed_at,omitempty"`
 }
 
-type Store struct {
-	db    *sql.DB
-	paths storage.Paths
-	quota *QuotaManager
+type StoreOptions struct {
+	MaxTotalStorage int64
+	MinFreeSpace    int64
+	FreeSpaceFn     func(path string) (uint64, error)
 }
 
-func NewStore(db *sql.DB, paths storage.Paths, quota *QuotaManager) *Store {
-	return &Store{
-		db:    db,
-		paths: paths,
-		quota: quota,
+type Store struct {
+	db              *sql.DB
+	paths           storage.Paths
+	quota           *QuotaManager
+	maxTotalStorage int64
+	minFreeSpace    int64
+	freeSpaceFn     func(path string) (uint64, error)
+}
+
+func NewStore(db *sql.DB, paths storage.Paths, quota *QuotaManager, opts ...StoreOptions) *Store {
+	s := &Store{
+		db:          db,
+		paths:       paths,
+		quota:       quota,
+		freeSpaceFn: storage.CheckFreeSpace,
 	}
+	if len(opts) > 0 {
+		s.maxTotalStorage = opts[0].MaxTotalStorage
+		s.minFreeSpace = opts[0].MinFreeSpace
+		if opts[0].FreeSpaceFn != nil {
+			s.freeSpaceFn = opts[0].FreeSpaceFn
+		}
+	}
+	return s
 }
 
 // SanitizeFilename cleans the input filename to remove directory separators,
@@ -141,6 +159,21 @@ func (s *Store) GetRoomUsageAndCount(ctx context.Context, roomID string) (int64,
 		return 0, 0, fmt.Errorf("query room usage: %w", err)
 	}
 	return usedBytes, count, nil
+}
+
+// GetTotalUsage returns the total finalized ready bytes across all rooms in the database.
+func (s *Store) GetTotalUsage(ctx context.Context) (int64, error) {
+	query := `
+		SELECT COALESCE(SUM(size_bytes), 0)
+		FROM files
+		WHERE status = 'ready';
+	`
+	var totalBytes int64
+	err := s.db.QueryRowContext(ctx, query).Scan(&totalBytes)
+	if err != nil {
+		return 0, fmt.Errorf("query total usage: %w", err)
+	}
+	return totalBytes, nil
 }
 
 // ListReadyFiles returns all files in a room with status = 'ready'.
@@ -247,6 +280,18 @@ func (s *Store) StreamUpload(
 	maxRoomSize int64,
 	maxFiles int,
 ) (*File, error) {
+	// 1. Filesystem Minimum Free Space check
+	if s.minFreeSpace > 0 && s.freeSpaceFn != nil {
+		freeBytes, err := s.freeSpaceFn(s.paths.DataDir)
+		if err != nil {
+			return nil, fmt.Errorf("check filesystem free space: %w", err)
+		}
+		if freeBytes <= uint64(s.minFreeSpace) {
+			return nil, ErrInsufficientStorage
+		}
+	}
+
+	// 2. Room file count and quota check
 	currentUsage, count, err := s.GetRoomUsageAndCount(ctx, roomID)
 	if err != nil {
 		return nil, err
@@ -260,19 +305,44 @@ func (s *Store) StreamUpload(
 		return nil, ErrQuotaExceeded
 	}
 
-	reservationSize := declaredSize
-	if reservationSize <= 0 || reservationSize > maxFileSize {
-		reservationSize = maxFileSize
-	}
-	if reservationSize > remainingRoomQuota {
-		reservationSize = remainingRoomQuota
+	// 3. Global storage usage check
+	var currentGlobalUsage int64
+	if s.maxTotalStorage > 0 {
+		currentGlobalUsage, err = s.GetTotalUsage(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if currentGlobalUsage >= s.maxTotalStorage {
+			return nil, ErrGlobalStorageExceeded
+		}
 	}
 
-	resID, err := s.quota.Acquire(roomID, reservationSize, currentUsage, maxRoomSize)
+	// 4. Calculate reservation size bounded by limits
+	reservationSize := declaredSize
+	if reservationSize <= 0 {
+		reservationSize = maxFileSize
+		if reservationSize > remainingRoomQuota {
+			reservationSize = remainingRoomQuota
+		}
+		if s.maxTotalStorage > 0 {
+			remainingGlobal := s.maxTotalStorage - currentGlobalUsage
+			if remainingGlobal > 0 && reservationSize > remainingGlobal {
+				reservationSize = remainingGlobal
+			}
+		}
+	}
+
+	// 5. Acquire atomic quota reservation
+	resID, err := s.quota.Acquire(roomID, reservationSize, currentUsage, maxRoomSize, currentGlobalUsage, s.maxTotalStorage)
 	if err != nil {
 		return nil, err
 	}
-	defer s.quota.Release(resID)
+	resReleased := false
+	defer func() {
+		if !resReleased {
+			s.quota.Release(resID)
+		}
+	}()
 
 	fileID, err := GenerateFileID()
 	if err != nil {
@@ -307,6 +377,12 @@ func (s *Store) StreamUpload(
 	if remainingQuota < allowedBytes {
 		allowedBytes = remainingQuota
 	}
+	if s.maxTotalStorage > 0 {
+		remainingGlobal := s.maxTotalStorage - currentGlobalUsage
+		if remainingGlobal < allowedBytes {
+			allowedBytes = remainingGlobal
+		}
+	}
 
 	// Stream with buffer and limit check
 	buf := make([]byte, 32*1024)
@@ -318,6 +394,12 @@ func (s *Store) StreamUpload(
 		n, readErr := r.Read(buf)
 		if n > 0 {
 			if written+int64(n) > allowedBytes {
+				if s.maxTotalStorage > 0 && written+int64(n) > s.maxTotalStorage-currentGlobalUsage {
+					return nil, ErrGlobalStorageExceeded
+				}
+				if written+int64(n) > remainingQuota {
+					return nil, ErrQuotaExceeded
+				}
 				return nil, ErrFileTooLarge
 			}
 
@@ -381,6 +463,10 @@ func (s *Store) StreamUpload(
 		_ = os.Remove(finalPath)
 		return nil, fmt.Errorf("record file in database: %w", err)
 	}
+
+	// Release in-flight reservation immediately after successful DB commit
+	s.quota.Release(resID)
+	resReleased = true
 
 	return &File{
 		ID:               fileID,

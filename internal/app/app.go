@@ -56,7 +56,10 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 
 	roomStore := room.NewStore(db, cfg.ServerSecret)
 	quotaManager := file.NewQuotaManager()
-	fileStore := file.NewStore(db, paths, quotaManager)
+	fileStore := file.NewStore(db, paths, quotaManager, file.StoreOptions{
+		MaxTotalStorage: cfg.MaxTotalStorage,
+		MinFreeSpace:    cfg.MinFreeSpace,
+	})
 	cleanupWorker := cleanup.NewWorker(db, paths, cleanup.Options{
 		Interval:            cfg.CleanupInterval,
 		BatchSize:           cfg.CleanupBatchSize,
@@ -686,8 +689,8 @@ func (a *App) routes() (http.Handler, error) {
 						writeJSONError(w, "room file count limit reached", http.StatusBadRequest)
 						return
 					}
-					if errors.Is(err, file.ErrFileTooLarge) || errors.Is(err, file.ErrQuotaExceeded) {
-						writeJSONError(w, "file exceeds maximum size or room quota", http.StatusRequestEntityTooLarge)
+					if errors.Is(err, file.ErrFileTooLarge) || errors.Is(err, file.ErrQuotaExceeded) || errors.Is(err, file.ErrGlobalStorageExceeded) || errors.Is(err, file.ErrInsufficientStorage) {
+						writeJSONError(w, "file exceeds maximum size or storage quota", http.StatusRequestEntityTooLarge)
 						return
 					}
 					a.logger.Error("failed to stream upload", "error", err)

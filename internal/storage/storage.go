@@ -90,3 +90,8 @@ func checkWritable(path string) error {
 	}
 	return nil
 }
+
+// CheckFreeSpace queries the filesystem containing path for free bytes available to the caller.
+func CheckFreeSpace(path string) (uint64, error) {
+	return checkFreeSpaceOS(path)
+}

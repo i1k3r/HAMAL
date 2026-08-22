@@ -451,6 +451,50 @@ func TestFileUploadExceedsMaxFileSize(t *testing.T) {
 	}
 }
 
+func TestAppGlobalStorageLimitEnforcement(t *testing.T) {
+	cfg := config.Default()
+	cfg.MaxTotalStorage = 100 * 1024 // 100 KB global limit
+	a := testAppWithConfig(t, cfg)
+
+	// Create Room 1
+	createReq1 := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq1.Header.Set("Content-Type", "application/json")
+	createResp1 := httptest.NewRecorder()
+	a.Handler().ServeHTTP(createResp1, createReq1)
+	var room1 struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp1.Body).Decode(&room1)
+
+	// Create Room 2
+	createReq2 := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq2.Header.Set("Content-Type", "application/json")
+	createResp2 := httptest.NewRecorder()
+	a.Handler().ServeHTTP(createResp2, createReq2)
+	var room2 struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp2.Body).Decode(&room2)
+
+	// Upload 70 KB to Room 1 -> must succeed (70 KB <= 100 KB)
+	payload1 := bytes.Repeat([]byte("A"), 70*1024)
+	upReq1 := createMultipartRequest(t, "/api/v1/rooms/"+room1.ParticipantToken+"/files", "file", "r1.bin", payload1)
+	upResp1 := httptest.NewRecorder()
+	a.Handler().ServeHTTP(upResp1, upReq1)
+	if upResp1.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for Room 1 upload, got %d: %s", upResp1.Code, upResp1.Body.String())
+	}
+
+	// Upload 50 KB to Room 2 -> must return 413 because 70 KB + 50 KB > 100 KB
+	payload2 := bytes.Repeat([]byte("B"), 50*1024)
+	upReq2 := createMultipartRequest(t, "/api/v1/rooms/"+room2.ParticipantToken+"/files", "file", "r2.bin", payload2)
+	upResp2 := httptest.NewRecorder()
+	a.Handler().ServeHTTP(upResp2, upReq2)
+	if upResp2.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413 Request Entity Too Large for exceeding global quota, got %d: %s", upResp2.Code, upResp2.Body.String())
+	}
+}
+
 func TestFileUploadExpiredAndClosedRooms(t *testing.T) {
 	a := testApp(t)
 

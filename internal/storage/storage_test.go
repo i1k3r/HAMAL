@@ -79,3 +79,14 @@ func TestResolveServerSecretRejectsShortProvidedSecret(t *testing.T) {
 		t.Fatal("expected error for short provided secret, got nil")
 	}
 }
+
+func TestCheckFreeSpace(t *testing.T) {
+	tempDir := t.TempDir()
+	freeBytes, err := CheckFreeSpace(tempDir)
+	if err != nil {
+		t.Fatalf("CheckFreeSpace failed: %v", err)
+	}
+	if freeBytes == 0 {
+		t.Fatal("expected non-zero free disk space")
+	}
+}
