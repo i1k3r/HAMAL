@@ -102,11 +102,12 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		uploadLimiter:   uploadLimiter,
 		downloadLimiter: downloadLimiter,
 	}
-	a.handler, err = a.routes()
+	routesHandler, err := a.routes()
 	if err != nil {
 		db.Close()
 		return nil, err
 	}
+	a.handler = a.securityHeadersMiddleware(routesHandler)
 	return a, nil
 }
 
@@ -197,6 +198,23 @@ func (a *App) checkRateLimit(w http.ResponseWriter, r *http.Request, limiter *IP
 		return false
 	}
 	return true
+}
+
+func (a *App) securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self';")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()")
+
+		if a.isHTTPS(r) {
+			h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 type idleTimeoutReader struct {

@@ -2486,3 +2486,196 @@ func TestConcurrentFileLimitHTTP(t *testing.T) {
 		t.Fatalf("expected exactly 2 files in room status, got %d", len(statusData.Files))
 	}
 }
+
+func TestSecurityHeadersOnHTMLViews(t *testing.T) {
+	a := testApp(t)
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	// 1. Create a room to obtain tokens
+	createReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := http.DefaultClient.Do(createReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roomData struct {
+		CreatorToken     string `json:"creator_token"`
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	urls := []string{
+		ts.URL + "/",
+		ts.URL + "/c/" + roomData.CreatorToken,
+		ts.URL + "/r/" + roomData.ParticipantToken,
+	}
+
+	expectedCSP := "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self';"
+
+	for _, u := range urls {
+		resp, err := http.Get(u)
+		if err != nil {
+			t.Fatalf("GET %s failed: %v", u, err)
+		}
+		defer resp.Body.Close()
+
+		if csp := resp.Header.Get("Content-Security-Policy"); csp != expectedCSP {
+			t.Errorf("[%s] expected CSP %q, got %q", u, expectedCSP, csp)
+		}
+		if xfo := resp.Header.Get("X-Frame-Options"); xfo != "DENY" {
+			t.Errorf("[%s] expected X-Frame-Options DENY, got %q", u, xfo)
+		}
+		if xcto := resp.Header.Get("X-Content-Type-Options"); xcto != "nosniff" {
+			t.Errorf("[%s] expected X-Content-Type-Options nosniff, got %q", u, xcto)
+		}
+		if ref := resp.Header.Get("Referrer-Policy"); ref != "no-referrer" {
+			t.Errorf("[%s] expected Referrer-Policy no-referrer, got %q", u, ref)
+		}
+		if perm := resp.Header.Get("Permissions-Policy"); perm != "camera=(), microphone=(), geolocation=(), payment=(), usb=()" {
+			t.Errorf("[%s] expected Permissions-Policy camera=(), ..., got %q", u, perm)
+		}
+	}
+}
+
+func TestSecurityHeadersOnStaticAssets(t *testing.T) {
+	a := testApp(t)
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	urls := []string{
+		ts.URL + "/static/site.css",
+		ts.URL + "/static/site.js",
+		ts.URL + "/static/brand/hamal-logo-light.svg",
+	}
+
+	for _, u := range urls {
+		resp, err := http.Get(u)
+		if err != nil {
+			t.Fatalf("GET %s failed: %v", u, err)
+		}
+		defer resp.Body.Close()
+
+		if xcto := resp.Header.Get("X-Content-Type-Options"); xcto != "nosniff" {
+			t.Errorf("[%s] expected nosniff, got %q", u, xcto)
+		}
+		if xfo := resp.Header.Get("X-Frame-Options"); xfo != "DENY" {
+			t.Errorf("[%s] expected DENY, got %q", u, xfo)
+		}
+	}
+}
+
+func TestSecurityHeadersOnAPIEndpoints(t *testing.T) {
+	a := testApp(t)
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	apiPaths := []string{
+		"/healthz",
+		"/readyz",
+	}
+
+	for _, p := range apiPaths {
+		resp, err := http.Get(ts.URL + p)
+		if err != nil {
+			t.Fatalf("GET %s failed: %v", p, err)
+		}
+		defer resp.Body.Close()
+
+		if xcto := resp.Header.Get("X-Content-Type-Options"); xcto != "nosniff" {
+			t.Errorf("[%s] expected nosniff, got %q", p, xcto)
+		}
+		if xfo := resp.Header.Get("X-Frame-Options"); xfo != "DENY" {
+			t.Errorf("[%s] expected DENY, got %q", p, xfo)
+		}
+	}
+}
+
+func TestSecurityHeadersOnFileDownload(t *testing.T) {
+	a := testApp(t)
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	// 1. Create room
+	createReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := http.DefaultClient.Do(createReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roomData struct {
+		CreatorToken     string `json:"creator_token"`
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	// 2. Upload file
+	body := &bytes.Buffer{}
+	w := multipart.NewWriter(body)
+	p, _ := w.CreateFormFile("file", "download_sec.txt")
+	_, _ = p.Write([]byte("security headers file content"))
+	_ = w.Close()
+
+	upReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", body)
+	upReq.Header.Set("Content-Type", w.FormDataContentType())
+	upResp, err := http.DefaultClient.Do(upReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fileData struct {
+		ID string `json:"file_id"`
+	}
+	_ = json.NewDecoder(upResp.Body).Decode(&fileData)
+	upResp.Body.Close()
+
+	// 3. Download file and verify security headers
+	downResp, err := http.Get(ts.URL + "/api/v1/rooms/" + roomData.ParticipantToken + "/files/" + fileData.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer downResp.Body.Close()
+
+	if xcto := downResp.Header.Get("X-Content-Type-Options"); xcto != "nosniff" {
+		t.Errorf("expected nosniff on download, got %q", xcto)
+	}
+	if xfo := downResp.Header.Get("X-Frame-Options"); xfo != "DENY" {
+		t.Errorf("expected DENY on download, got %q", xfo)
+	}
+	if csp := downResp.Header.Get("Content-Security-Policy"); csp == "" {
+		t.Errorf("expected CSP on download, got empty")
+	}
+}
+
+func TestHSTSConditionallySentOnHTTPS(t *testing.T) {
+	cfg := config.Default()
+	cfg.TrustedProxies = []string{"127.0.0.1/32", "::1/128"}
+	a := testAppWithConfig(t, cfg)
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	// 1. Plain HTTP request -> HSTS must NOT be set
+	plainResp, err := http.Get(ts.URL + "/healthz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer plainResp.Body.Close()
+	if hsts := plainResp.Header.Get("Strict-Transport-Security"); hsts != "" {
+		t.Fatalf("expected no HSTS on plain HTTP, got %q", hsts)
+	}
+
+	// 2. Request behind trusted proxy with HTTPS -> HSTS must be set
+	httpsReq, _ := http.NewRequest(http.MethodGet, ts.URL+"/healthz", nil)
+	httpsReq.Header.Set("X-Forwarded-Proto", "https")
+	httpsResp, err := http.DefaultClient.Do(httpsReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer httpsResp.Body.Close()
+	expectedHSTS := "max-age=31536000; includeSubDomains"
+	if hsts := httpsResp.Header.Get("Strict-Transport-Security"); hsts != expectedHSTS {
+		t.Fatalf("expected HSTS %q on HTTPS, got %q", expectedHSTS, hsts)
+	}
+}
