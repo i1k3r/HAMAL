@@ -296,9 +296,6 @@ func (s *Store) StreamUpload(
 	if err != nil {
 		return nil, err
 	}
-	if count >= maxFiles {
-		return nil, ErrFileLimitReached
-	}
 
 	remainingRoomQuota := maxRoomSize - currentUsage
 	if remainingRoomQuota <= 0 {
@@ -338,8 +335,8 @@ func (s *Store) StreamUpload(
 		}
 	}
 
-	// 5. Acquire atomic initial quota reservation
-	resID, err := s.quota.Acquire(roomID, initialReservation, currentUsage, maxRoomSize, currentGlobalUsage, s.maxTotalStorage)
+	// 5. Acquire atomic initial quota and file slot reservation
+	resID, err := s.quota.Acquire(roomID, initialReservation, currentUsage, maxRoomSize, count, maxFiles, currentGlobalUsage, s.maxTotalStorage)
 	if err != nil {
 		return nil, err
 	}

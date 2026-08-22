@@ -2402,3 +2402,87 @@ func TestOverDeclaredContentLengthHTTPNoStarvation(t *testing.T) {
 		t.Fatalf("upload 2 failed: %d", upResp2.StatusCode)
 	}
 }
+
+func TestConcurrentFileLimitHTTP(t *testing.T) {
+	cfg := config.Default()
+	cfg.MaxFilesPerRoom = 2
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	createReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := http.DefaultClient.Do(createReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	// Launch 4 concurrent uploads against MaxFilesPerRoom = 2
+	var wg sync.WaitGroup
+	var successCount int
+	var failCount int
+	var mu sync.Mutex
+
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			body := &bytes.Buffer{}
+			w := multipart.NewWriter(body)
+			p, _ := w.CreateFormFile("file", fmt.Sprintf("file_%d.txt", idx))
+			_, _ = p.Write([]byte("HAMAL concurrent file count test payload"))
+			_ = w.Close()
+
+			upReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", body)
+			upReq.Header.Set("Content-Type", w.FormDataContentType())
+			upResp, err := http.DefaultClient.Do(upReq)
+			if err != nil {
+				return
+			}
+			defer upResp.Body.Close()
+
+			mu.Lock()
+			if upResp.StatusCode == http.StatusCreated {
+				successCount++
+			} else if upResp.StatusCode == http.StatusBadRequest {
+				var errResp struct {
+					Error string `json:"error"`
+				}
+				_ = json.NewDecoder(upResp.Body).Decode(&errResp)
+				if strings.Contains(errResp.Error, "room file count limit reached") {
+					failCount++
+				}
+			}
+			mu.Unlock()
+		}(i)
+	}
+	wg.Wait()
+
+	if successCount != 2 || failCount != 2 {
+		t.Fatalf("expected exactly 2 created (201) and 2 rejected (400), got created=%d, rejected=%d", successCount, failCount)
+	}
+
+	// Verify room files list has exactly 2 files
+	statusReq, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", nil)
+	statusResp, err := http.DefaultClient.Do(statusReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer statusResp.Body.Close()
+	var statusData struct {
+		Files []struct {
+			ID string `json:"id"`
+		} `json:"files"`
+	}
+	_ = json.NewDecoder(statusResp.Body).Decode(&statusData)
+	if len(statusData.Files) != 2 {
+		t.Fatalf("expected exactly 2 files in room status, got %d", len(statusData.Files))
+	}
+}
