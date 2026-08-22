@@ -1,13 +1,13 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>lan-drop</Name>
-  <Repository>ghcr.io/i1k3r/lan-drop:latest</Repository>
-  <Registry>https://github.com/i1k3r/lan-drop/pkgs/container/lan-drop</Registry>
+  <Name>hamal</Name>
+  <Repository>ghcr.io/i1k3r/hamal:latest</Repository>
+  <Registry>https://github.com/i1k3r/HAMAL/pkgs/container/hamal</Registry>
   <Network>bridge</Network>
   <Privileged>false</Privileged>
-  <Support>https://github.com/i1k3r/lan-drop/issues</Support>
-  <Project>https://github.com/i1k3r/lan-drop</Project>
-  <Overview>Self-hosted, temporary browser-based file-sharing application for local networks. Features QR code sharing, streaming uploads/downloads up to 10 GiB, optional PIN protection, background cleanup, and temporary Global Share links.</Overview>
+  <Support>https://github.com/i1k3r/HAMAL/issues</Support>
+  <Project>https://github.com/i1k3r/HAMAL</Project>
+  <Overview>HAMAL — Point-to-point local file transfer. Fast, lightweight, private courier file sharing across local networks with QR code pairing, streaming multi-gigabyte transfers, optional PIN protection, background cleanup, and temporary Global Share links.</Overview>
   <Category>Tools: Productivity: Network:Web</Category>
   <WebUI>http://[IP]:[PORT:7700]</WebUI>
   <ExtraParams>--read-only --tmpfs /tmp --security-opt no-new-privileges:true</ExtraParams>
@@ -23,7 +23,7 @@
   </Networking>
   <Data>
     <Volume>
-      <HostDir>/mnt/user/appdata/lan-drop</HostDir>
+      <HostDir>/mnt/user/appdata/hamal</HostDir>
       <ContainerDir>/data</ContainerDir>
       <Mode>rw</Mode>
     </Volume>
@@ -36,6 +36,6 @@
     </Variable>
   </Environment>
   <Config Name="WebUI Port" Target="7700" Default="7700" Mode="tcp" Description="Web interface port" Type="Port" Display="always" Required="true" Mask="false">7700</Config>
-  <Config Name="Appdata Storage" Target="/data" Default="/mnt/user/appdata/lan-drop" Mode="rw" Description="Persistent storage directory for SQLite database, uploaded files, and server secrets (must be owned/writable by UID:GID 10001:10001)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/lan-drop</Config>
+  <Config Name="Appdata Storage" Target="/data" Default="/mnt/user/appdata/hamal" Mode="rw" Description="Persistent storage directory for SQLite database, uploaded files, and server secrets (must be owned/writable by UID:GID 10001:10001)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/hamal</Config>
   <Config Name="Timezone" Target="TZ" Default="Europe/Istanbul" Description="Container timezone" Type="Variable" Display="always" Required="false" Mask="false">Europe/Istanbul</Config>
 </Container>

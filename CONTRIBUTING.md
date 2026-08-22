@@ -1,6 +1,6 @@
-# Contributing to LAN-Drop
+# Contributing to HAMAL
 
-Thank you for helping build LAN-Drop. Keep contributions focused, documented, tested, and consistent with the locked MVP architecture in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+Thank you for helping build HAMAL. Keep contributions focused, documented, tested, and consistent with the architecture in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Development principles
 
@@ -17,7 +17,7 @@ Thank you for helping build LAN-Drop. Keep contributions focused, documented, te
 gofmt -w .
 go test ./...
 go vet ./...
-docker build -t lan-drop:local .
+docker build -t hamal:local .
 ```
 
 Please open an issue or discussion before changing any locked architecture decision.

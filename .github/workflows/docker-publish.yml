@@ -34,16 +34,21 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: |
+            ghcr.io/i1k3r/hamal
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
             type=sha,prefix=sha-,format=short
           labels: |
-            org.opencontainers.image.title=LAN-Drop
-            org.opencontainers.image.description=Fast, secure peer-to-peer file sharing over LAN
-            org.opencontainers.image.source=https://github.com/i1k3r/lan-drop
+            org.opencontainers.image.title=HAMAL
+            org.opencontainers.image.description=Point-to-point local file transfer. The carrier for your digital cargo.
+            org.opencontainers.image.source=https://github.com/i1k3r/HAMAL
             org.opencontainers.image.vendor=i1k3r
+            org.opencontainers.image.licenses=MIT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6

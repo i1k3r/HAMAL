@@ -1,14 +1,14 @@
 services:
-  lan-drop:
+  hamal:
     build: .
-    image: ghcr.io/i1k3r/lan-drop:latest
-    container_name: lan-drop
+    image: ghcr.io/i1k3r/hamal:latest
+    container_name: hamal
     ports:
       - "7700:7700"
     env_file:
       - .env
     volumes:
-      - lan-drop-data:/data
+      - hamal-data:/data
     restart: unless-stopped
     read_only: true
     tmpfs:
@@ -17,4 +17,4 @@ services:
       - no-new-privileges:true
 
 volumes:
-  lan-drop-data:
+  hamal-data:
