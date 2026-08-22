@@ -454,6 +454,7 @@ func TestFileUploadExceedsMaxFileSize(t *testing.T) {
 func TestAppGlobalStorageLimitEnforcement(t *testing.T) {
 	cfg := config.Default()
 	cfg.MaxTotalStorage = 100 * 1024 // 100 KB global limit
+	cfg.MinFreeSpace = 0
 	a := testAppWithConfig(t, cfg)
 
 	// Create Room 1
@@ -1339,10 +1340,8 @@ func TestConcurrentPINAttempts(t *testing.T) {
 
 func testAppWithConfig(t *testing.T, cfg config.Config) *App {
 	t.Helper()
-	if cfg.DataDir == "" {
+	if cfg.DataDir == "" || cfg.DataDir == "/data" {
 		cfg.DataDir = t.TempDir()
-	}
-	if cfg.DBPath == "" {
 		cfg.DBPath = filepath.Join(cfg.DataDir, "lan-drop.db")
 	}
 	a, err := New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
@@ -1444,4 +1443,345 @@ func TestDualTierRateLimitingAndNATSharing(t *testing.T) {
 
 func TestSafePathMasksShareTokensInLogs(t *testing.T) {
 	t.Skip("global share HTTP endpoints reserved for future routing")
+}
+
+func TestRoomCreationRateLimit(t *testing.T) {
+	cfg := config.Default()
+	cfg.ShareManagementRateLimit = 2 // 2 req/min, burst 5 (minimum burst is 5)
+	a := testAppWithConfig(t, cfg)
+
+	// Send 5 initial requests from same IP (192.168.1.50) -> all should succeed (burst = 5)
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.RemoteAddr = "192.168.1.50:12345"
+		resp := httptest.NewRecorder()
+		a.Handler().ServeHTTP(resp, req)
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("expected 201 Created for request %d, got %d", i+1, resp.Code)
+		}
+	}
+
+	// 6th request from same IP -> must return 429 Too Many Requests with Retry-After header
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.RemoteAddr = "192.168.1.50:12345"
+	resp := httptest.NewRecorder()
+	a.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 Too Many Requests, got %d: %s", resp.Code, resp.Body.String())
+	}
+	retryAfter := resp.Header().Get("Retry-After")
+	if retryAfter == "" {
+		t.Fatal("expected Retry-After header on 429 response")
+	}
+}
+
+func TestRateLimitDifferentIPs(t *testing.T) {
+	cfg := config.Default()
+	cfg.ShareManagementRateLimit = 2 // burst 5
+	a := testAppWithConfig(t, cfg)
+
+	// Exhaust IP 1's bucket
+	for i := 0; i < 6; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.RemoteAddr = "192.168.1.100:12345"
+		resp := httptest.NewRecorder()
+		a.Handler().ServeHTTP(resp, req)
+		if i == 5 && resp.Code != http.StatusTooManyRequests {
+			t.Fatalf("expected 429 for IP 1 on 6th request, got %d", resp.Code)
+		}
+	}
+
+	// Request from IP 2 (192.168.1.101) must succeed and not be blocked by IP 1
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	req2.Header.Set("Content-Type", "application/json")
+	req2.RemoteAddr = "192.168.1.101:12345"
+	resp2 := httptest.NewRecorder()
+	a.Handler().ServeHTTP(resp2, req2)
+	if resp2.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for IP 2, got %d: %s", resp2.Code, resp2.Body.String())
+	}
+}
+
+func TestUntrustedProxySpoofingIgnored(t *testing.T) {
+	cfg := config.Default()
+	cfg.ShareManagementRateLimit = 2 // burst 5
+	cfg.TrustedProxies = nil         // No trusted proxies configured
+	a := testAppWithConfig(t, cfg)
+
+	// Attacker sends 5 requests from RemoteAddr 10.0.0.50 with spoofed rotating X-Forwarded-For headers
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.RemoteAddr = "10.0.0.50:44321"
+		req.Header.Set("X-Forwarded-For", fmt.Sprintf("192.168.1.%d", i+1))
+		resp := httptest.NewRecorder()
+		a.Handler().ServeHTTP(resp, req)
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("expected 201 Created for request %d, got %d", i+1, resp.Code)
+		}
+	}
+
+	// 6th request from 10.0.0.50 with another spoofed X-Forwarded-For must be blocked as 429
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.RemoteAddr = "10.0.0.50:44321"
+	req.Header.Set("X-Forwarded-For", "192.168.1.99")
+	resp := httptest.NewRecorder()
+	a.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 because spoofed X-Forwarded-For must be ignored for untrusted RemoteAddr, got %d", resp.Code)
+	}
+}
+
+func TestTrustedProxyClientIPExtracted(t *testing.T) {
+	cfg := config.Default()
+	cfg.ShareManagementRateLimit = 2 // burst 5
+	cfg.TrustedProxies = []string{"10.0.0.0/8"}
+	a := testAppWithConfig(t, cfg)
+
+	// 5 requests through trusted proxy 10.0.0.1 for client 203.0.113.42 -> all succeed
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.RemoteAddr = "10.0.0.1:50000"
+		req.Header.Set("X-Forwarded-For", "203.0.113.42, 10.0.0.2")
+		resp := httptest.NewRecorder()
+		a.Handler().ServeHTTP(resp, req)
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("expected 201 Created for request %d, got %d", i+1, resp.Code)
+		}
+	}
+
+	// 6th request for client 203.0.113.42 -> 429
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.RemoteAddr = "10.0.0.1:50000"
+	req.Header.Set("X-Forwarded-For", "203.0.113.42, 10.0.0.2")
+	resp := httptest.NewRecorder()
+	a.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 for client 203.0.113.42 through trusted proxy, got %d", resp.Code)
+	}
+
+	// Request through same trusted proxy for a DIFFERENT real client (203.0.113.43) must succeed
+	reqOther := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	reqOther.Header.Set("Content-Type", "application/json")
+	reqOther.RemoteAddr = "10.0.0.1:50000"
+	reqOther.Header.Set("X-Forwarded-For", "203.0.113.43, 10.0.0.2")
+	respOther := httptest.NewRecorder()
+	a.Handler().ServeHTTP(respOther, reqOther)
+	if respOther.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for different client 203.0.113.43, got %d", respOther.Code)
+	}
+}
+
+func TestPINAuthRateLimit(t *testing.T) {
+	cfg := config.Default()
+	cfg.ShareManagementRateLimit = 2 // burst 5
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	// Create Room 1 with PIN
+	createReq1 := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600, "pin": "1234"}`))
+	createReq1.Header.Set("Content-Type", "application/json")
+	createReq1.RemoteAddr = "192.168.1.10:11111"
+	createResp1 := httptest.NewRecorder()
+	a.Handler().ServeHTTP(createResp1, createReq1)
+	var room1 struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp1.Body).Decode(&room1)
+
+	// Create Room 2 with PIN
+	createReq2 := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600, "pin": "5678"}`))
+	createReq2.Header.Set("Content-Type", "application/json")
+	createReq2.RemoteAddr = "192.168.1.10:11111"
+	createResp2 := httptest.NewRecorder()
+	a.Handler().ServeHTTP(createResp2, createReq2)
+	var room2 struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp2.Body).Decode(&room2)
+
+	// 3 wrong PIN attempts on Room 1 from IP 192.168.1.77 -> return 401
+	for i := 0; i < 3; i++ {
+		pinReq := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/"+room1.ParticipantToken+"/auth/pin", strings.NewReader(`{"pin": "9999"}`))
+		pinReq.Header.Set("Content-Type", "application/json")
+		pinReq.RemoteAddr = "192.168.1.77:22222"
+		pinResp := httptest.NewRecorder()
+		a.Handler().ServeHTTP(pinResp, pinReq)
+		if pinResp.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401 for wrong pin on Room 1 attempt %d, got %d", i+1, pinResp.Code)
+		}
+	}
+
+	// 2 wrong PIN attempts on Room 2 from same IP 192.168.1.77 -> return 401
+	for i := 0; i < 2; i++ {
+		pinReq := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/"+room2.ParticipantToken+"/auth/pin", strings.NewReader(`{"pin": "9999"}`))
+		pinReq.Header.Set("Content-Type", "application/json")
+		pinReq.RemoteAddr = "192.168.1.77:22222"
+		pinResp := httptest.NewRecorder()
+		a.Handler().ServeHTTP(pinResp, pinReq)
+		if pinResp.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401 for wrong pin on Room 2 attempt %d, got %d", i+1, pinResp.Code)
+		}
+	}
+
+	// 6th total PIN attempt from IP 192.168.1.77 on Room 2 -> must be blocked by IP rate limiter (429)
+	// even though Room 2 only had 2 failed attempts (not locked)
+	pinReq := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/"+room2.ParticipantToken+"/auth/pin", strings.NewReader(`{"pin": "9999"}`))
+	pinReq.Header.Set("Content-Type", "application/json")
+	pinReq.RemoteAddr = "192.168.1.77:22222"
+	pinResp := httptest.NewRecorder()
+	a.Handler().ServeHTTP(pinResp, pinReq)
+	if pinResp.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 Too Many Requests on 6th PIN attempt, got %d: %s", pinResp.Code, pinResp.Body.String())
+	}
+}
+
+func TestFileUploadRateLimit(t *testing.T) {
+	cfg := config.Default()
+	cfg.ShareManagementRateLimit = 2 // upload limiter: rate 4/min, burst 2
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	// Create room
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.RemoteAddr = "192.168.1.10:11111"
+	createResp := httptest.NewRecorder()
+	a.Handler().ServeHTTP(createResp, createReq)
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+
+	// 2 upload requests (burst 2) from IP 192.168.1.88 -> both succeed (201 Created)
+	for i := 0; i < 2; i++ {
+		upReq := createMultipartRequest(t, "/api/v1/rooms/"+roomData.ParticipantToken+"/files", "file", fmt.Sprintf("test%d.txt", i), []byte("hello"))
+		upReq.RemoteAddr = "192.168.1.88:33333"
+		upResp := httptest.NewRecorder()
+		a.Handler().ServeHTTP(upResp, upReq)
+		if upResp.Code != http.StatusCreated {
+			t.Fatalf("expected 201 Created for upload %d, got %d", i+1, upResp.Code)
+		}
+	}
+
+	// 3rd upload request from same IP -> 429 Too Many Requests
+	upReq := createMultipartRequest(t, "/api/v1/rooms/"+roomData.ParticipantToken+"/files", "file", "test3.txt", []byte("hello"))
+	upReq.RemoteAddr = "192.168.1.88:33333"
+	upResp := httptest.NewRecorder()
+	a.Handler().ServeHTTP(upResp, upReq)
+	if upResp.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 Too Many Requests for 3rd upload, got %d: %s", upResp.Code, upResp.Body.String())
+	}
+}
+
+func TestFileDownloadRateLimit(t *testing.T) {
+	cfg := config.Default()
+	cfg.ShareAccessRateLimit = 6 // download limiter: rate 6/min, burst 1
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	// Create room and upload a file
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.RemoteAddr = "192.168.1.10:11111"
+	createResp := httptest.NewRecorder()
+	a.Handler().ServeHTTP(createResp, createReq)
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+
+	upReq := createMultipartRequest(t, "/api/v1/rooms/"+roomData.ParticipantToken+"/files", "file", "download_test.txt", []byte("content for download"))
+	upReq.RemoteAddr = "192.168.1.10:11111"
+	upResp := httptest.NewRecorder()
+	a.Handler().ServeHTTP(upResp, upReq)
+	var fileData struct {
+		ID string `json:"file_id"`
+	}
+	_ = json.NewDecoder(upResp.Body).Decode(&fileData)
+
+	// 1st download from IP 192.168.1.99 -> 200 OK
+	dlReq := httptest.NewRequest(http.MethodGet, "/api/v1/rooms/"+roomData.ParticipantToken+"/files/"+fileData.ID, nil)
+	dlReq.RemoteAddr = "192.168.1.99:44444"
+	dlResp := httptest.NewRecorder()
+	a.Handler().ServeHTTP(dlResp, dlReq)
+	if dlResp.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for download 1, got %d", dlResp.Code)
+	}
+
+	// 2nd download from same IP -> 429 Too Many Requests
+	dlReq2 := httptest.NewRequest(http.MethodHead, "/api/v1/rooms/"+roomData.ParticipantToken+"/files/"+fileData.ID, nil)
+	dlReq2.RemoteAddr = "192.168.1.99:44444"
+	dlResp2 := httptest.NewRecorder()
+	a.Handler().ServeHTTP(dlResp2, dlReq2)
+	if dlResp2.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 Too Many Requests on 2nd download, got %d: %s", dlResp2.Code, dlResp2.Body.String())
+	}
+}
+
+func TestNormalConcurrencyNoFalsePositives(t *testing.T) {
+	cfg := config.Default() // Default generous limits (ShareManagementRateLimit: 30, ShareAccessRateLimit: 300)
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	// Create room
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.RemoteAddr = "192.168.1.1:10000"
+	createResp := httptest.NewRecorder()
+	a.Handler().ServeHTTP(createResp, createReq)
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+
+	// Run 8 concurrent participants from different IPs performing uploads
+	var wg sync.WaitGroup
+	var errorCount int
+	var mu sync.Mutex
+
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			req := createMultipartRequest(t, "/api/v1/rooms/"+roomData.ParticipantToken+"/files", "file", fmt.Sprintf("file_%d.txt", idx), []byte("concurrent data"))
+			req.RemoteAddr = fmt.Sprintf("192.168.1.%d:20000", idx+10)
+			resp := httptest.NewRecorder()
+			a.Handler().ServeHTTP(resp, req)
+			if resp.Code != http.StatusCreated {
+				t.Logf("upload %d failed with code %d: %s", idx, resp.Code, resp.Body.String())
+				mu.Lock()
+				errorCount++
+				mu.Unlock()
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	if errorCount != 0 {
+		t.Fatalf("expected 0 errors for legitimate concurrent participants, got %d", errorCount)
+	}
+}
+
+func TestRateLimiterRaceSafety(t *testing.T) {
+	limiter := NewIPRateLimiter(60, 20)
+	var wg sync.WaitGroup
+
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			ip := fmt.Sprintf("10.0.0.%d", idx%5)
+			for j := 0; j < 20; j++ {
+				_, _ = limiter.Allow(ip)
+			}
+		}(i)
+	}
+	wg.Wait()
 }

@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"strconv"
@@ -29,14 +30,19 @@ import (
 var assets embed.FS
 
 type App struct {
-	cfg           config.Config
-	db            *sql.DB
-	paths         storage.Paths
-	rooms         *room.Store
-	files         *file.Store
-	cleanupWorker *cleanup.Worker
-	logger        *slog.Logger
-	handler       http.Handler
+	cfg             config.Config
+	db              *sql.DB
+	paths           storage.Paths
+	rooms           *room.Store
+	files           *file.Store
+	cleanupWorker   *cleanup.Worker
+	logger          *slog.Logger
+	handler         http.Handler
+	trustedProxies  []*net.IPNet
+	roomLimiter     *IPRateLimiter
+	authLimiter     *IPRateLimiter
+	uploadLimiter   *IPRateLimiter
+	downloadLimiter *IPRateLimiter
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*App, error) {
@@ -68,14 +74,32 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		ClosedRoomRetention: cfg.ClosedRoomRetention,
 	}, logger)
 
+	var trustedProxies []*net.IPNet
+	for _, proxy := range cfg.TrustedProxies {
+		_, ipNet, err := net.ParseCIDR(strings.TrimSpace(proxy))
+		if err == nil && ipNet != nil {
+			trustedProxies = append(trustedProxies, ipNet)
+		}
+	}
+
+	roomLimiter := NewIPRateLimiter(cfg.ShareManagementRateLimit, cfg.ShareManagementRateLimit/3)
+	authLimiter := NewIPRateLimiter(cfg.ShareManagementRateLimit, cfg.ShareManagementRateLimit/3)
+	uploadLimiter := NewIPRateLimiter(cfg.ShareManagementRateLimit*2, cfg.ShareManagementRateLimit)
+	downloadLimiter := NewIPRateLimiter(cfg.ShareAccessRateLimit, cfg.ShareAccessRateLimit/6)
+
 	a := &App{
-		cfg:           cfg,
-		db:            db,
-		paths:         paths,
-		rooms:         roomStore,
-		files:         fileStore,
-		cleanupWorker: cleanupWorker,
-		logger:        logger,
+		cfg:             cfg,
+		db:              db,
+		paths:           paths,
+		rooms:           roomStore,
+		files:           fileStore,
+		cleanupWorker:   cleanupWorker,
+		logger:          logger,
+		trustedProxies:  trustedProxies,
+		roomLimiter:     roomLimiter,
+		authLimiter:     authLimiter,
+		uploadLimiter:   uploadLimiter,
+		downloadLimiter: downloadLimiter,
 	}
 	a.handler, err = a.routes()
 	if err != nil {
@@ -112,6 +136,68 @@ func (a *App) Ready() error {
 	return storage.Check(a.paths)
 }
 
+// clientIP extracts the verified client IP. If the request comes from a configured trusted proxy,
+// it inspects X-Forwarded-For or X-Real-IP. Otherwise it strictly returns RemoteAddr.
+func (a *App) clientIP(r *http.Request) string {
+	remoteHost, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		remoteHost = strings.TrimSpace(r.RemoteAddr)
+	} else {
+		remoteHost = strings.TrimSpace(remoteHost)
+	}
+
+	remoteIP := net.ParseIP(remoteHost)
+	if remoteIP == nil || len(a.trustedProxies) == 0 {
+		return remoteHost
+	}
+
+	isTrusted := false
+	for _, ipNet := range a.trustedProxies {
+		if ipNet.Contains(remoteIP) {
+			isTrusted = true
+			break
+		}
+	}
+
+	if !isTrusted {
+		return remoteHost
+	}
+
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		for _, part := range parts {
+			candidate := strings.TrimSpace(part)
+			if ip := net.ParseIP(candidate); ip != nil {
+				return candidate
+			}
+		}
+	}
+
+	if xri := strings.TrimSpace(r.Header.Get("X-Real-IP")); xri != "" {
+		if ip := net.ParseIP(xri); ip != nil {
+			return xri
+		}
+	}
+
+	return remoteHost
+}
+
+func (a *App) checkRateLimit(w http.ResponseWriter, r *http.Request, limiter *IPRateLimiter) bool {
+	if limiter == nil {
+		return true
+	}
+	ip := a.clientIP(r)
+	allowed, retryAfter := limiter.Allow(ip)
+	if !allowed {
+		if retryAfter > 0 {
+			w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(retryAfter.Seconds()))))
+		}
+		writeJSONError(w, "too many requests, please try again later", http.StatusTooManyRequests)
+		return false
+	}
+	return true
+}
+
 func (a *App) isHTTPS(r *http.Request) bool {
 	if a.cfg.SecureCookies == "true" {
 		return true
@@ -123,16 +209,17 @@ func (a *App) isHTTPS(r *http.Request) bool {
 		return true
 	}
 	// In auto mode, check if request is coming from a trusted reverse proxy
-	if len(a.cfg.TrustedProxies) > 0 {
+	if len(a.trustedProxies) > 0 {
 		remoteHost, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
-			remoteHost = r.RemoteAddr
+			remoteHost = strings.TrimSpace(r.RemoteAddr)
+		} else {
+			remoteHost = strings.TrimSpace(remoteHost)
 		}
 		clientIP := net.ParseIP(remoteHost)
 		if clientIP != nil {
-			for _, cidr := range a.cfg.TrustedProxies {
-				_, ipNet, err := net.ParseCIDR(cidr)
-				if err == nil && ipNet.Contains(clientIP) {
+			for _, ipNet := range a.trustedProxies {
+				if ipNet.Contains(clientIP) {
 					if strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
 						return true
 					}
@@ -326,6 +413,10 @@ func (a *App) routes() (http.Handler, error) {
 
 	// JSON API Endpoints
 	mux.HandleFunc("POST /api/v1/rooms", func(w http.ResponseWriter, r *http.Request) {
+		if !a.checkRateLimit(w, r, a.roomLimiter) {
+			return
+		}
+
 		var req struct {
 			TTLSeconds int    `json:"ttl_seconds"`
 			PIN        string `json:"pin"`
@@ -388,6 +479,10 @@ func (a *App) routes() (http.Handler, error) {
 
 	// Phase 4: Participant PIN verification
 	mux.HandleFunc("POST /api/v1/rooms/{token}/auth/pin", func(w http.ResponseWriter, r *http.Request) {
+		if !a.checkRateLimit(w, r, a.authLimiter) {
+			return
+		}
+
 		token := r.PathValue("token")
 		var req struct {
 			PIN string `json:"pin"`
@@ -620,6 +715,10 @@ func (a *App) routes() (http.Handler, error) {
 
 	// Phase 3A: True streaming file upload endpoint (PIN protected for participants)
 	mux.HandleFunc("POST /api/v1/rooms/{token}/files", func(w http.ResponseWriter, r *http.Request) {
+		if !a.checkRateLimit(w, r, a.uploadLimiter) {
+			return
+		}
+
 		token := r.PathValue("token")
 		rm, role, err := a.rooms.GetByToken(r.Context(), token)
 		if err != nil {
@@ -669,13 +768,18 @@ func (a *App) routes() (http.Handler, error) {
 				filename := part.FileName()
 				contentType := part.Header.Get("Content-Type")
 
+				declaredSize := int64(0)
+				if r.ContentLength > 0 {
+					declaredSize = r.ContentLength
+				}
+
 				uploaded, err := a.files.StreamUpload(
 					r.Context(),
 					rm.ID,
 					filename,
 					contentType,
 					part,
-					0,
+					declaredSize,
 					rm.MaxFileSize,
 					rm.MaxRoomSize,
 					rm.MaxFiles,
@@ -768,6 +872,10 @@ func (a *App) routes() (http.Handler, error) {
 
 	// Phase 3B: File download endpoint (PIN protected for participants)
 	downloadHandler := func(w http.ResponseWriter, r *http.Request) {
+		if !a.checkRateLimit(w, r, a.downloadLimiter) {
+			return
+		}
+
 		token := r.PathValue("token")
 		fileID := r.PathValue("file_id")
 

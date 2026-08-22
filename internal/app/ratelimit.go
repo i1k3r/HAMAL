@@ -1,8 +1,7 @@
 package app
 
 import (
-	"net"
-	"net/http"
+	"math"
 	"sync"
 	"time"
 )
@@ -12,6 +11,7 @@ type clientBucket struct {
 	lastUpdate time.Time
 }
 
+// IPRateLimiter provides thread-safe token bucket rate limiting per client IP.
 type IPRateLimiter struct {
 	mu      sync.Mutex
 	rate    float64 // tokens added per second
@@ -19,9 +19,11 @@ type IPRateLimiter struct {
 	clients map[string]*clientBucket
 }
 
+// NewIPRateLimiter initializes a rate limiter given requests per minute and max burst size.
+// Returns nil if reqPerMinute <= 0 to indicate that rate limiting is disabled.
 func NewIPRateLimiter(reqPerMinute int, burst int) *IPRateLimiter {
 	if reqPerMinute <= 0 {
-		reqPerMinute = 60
+		return nil
 	}
 	if burst <= 0 {
 		burst = reqPerMinute / 6
@@ -36,7 +38,13 @@ func NewIPRateLimiter(reqPerMinute int, burst int) *IPRateLimiter {
 	}
 }
 
-func (l *IPRateLimiter) Allow(ip string) bool {
+// Allow checks whether an operation from client IP is allowed.
+// Returns allowed boolean and the recommended Retry-After duration when rate-limited.
+func (l *IPRateLimiter) Allow(ip string) (bool, time.Duration) {
+	if l == nil || l.rate <= 0 {
+		return true, 0
+	}
+
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -47,7 +55,7 @@ func (l *IPRateLimiter) Allow(ip string) bool {
 			tokens:     l.burst - 1,
 			lastUpdate: now,
 		}
-		// Periodically clean up stale client entries
+		// Periodically clean up stale client entries to prevent memory growth
 		if len(l.clients) > 2000 {
 			for k, v := range l.clients {
 				if now.Sub(v.lastUpdate) > 10*time.Minute {
@@ -55,7 +63,7 @@ func (l *IPRateLimiter) Allow(ip string) bool {
 				}
 			}
 		}
-		return true
+		return true, 0
 	}
 
 	elapsed := now.Sub(b.lastUpdate).Seconds()
@@ -67,15 +75,13 @@ func (l *IPRateLimiter) Allow(ip string) bool {
 
 	if b.tokens >= 1.0 {
 		b.tokens -= 1.0
-		return true
+		return true, 0
 	}
-	return false
-}
 
-func extractClientIP(r *http.Request) string {
-	remoteHost, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		remoteHost = r.RemoteAddr
+	needed := 1.0 - b.tokens
+	retrySeconds := needed / l.rate
+	if retrySeconds < 1.0 {
+		retrySeconds = 1.0
 	}
-	return remoteHost
+	return false, time.Duration(math.Ceil(retrySeconds)) * time.Second
 }
