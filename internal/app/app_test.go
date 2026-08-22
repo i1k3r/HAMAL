@@ -1415,35 +1415,429 @@ func TestGlobalShareDisabledByDefault(t *testing.T) {
 }
 
 func TestGlobalShareEnabledWithoutPublicBaseURL(t *testing.T) {
-	t.Skip("global share HTTP endpoints reserved for future routing")
+	cfg := config.Default()
+	cfg.GlobalShareEnabled = true
+	cfg.PublicBaseURL = ""
+	a := testAppWithConfig(t, cfg)
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	creatorToken, fileID := createRoomAndUploadFile(t, a, "share_test.txt", []byte("share content data"))
+
+	// Create share
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+creatorToken+"/files/"+fileID+"/share", strings.NewReader(`{"ttl_seconds": 1800}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 Created, got %d", resp.StatusCode)
+	}
+
+	var data struct {
+		ShareID   string `json:"share_id"`
+		ShareURL  string `json:"share_url"`
+		ExpiresAt string `json:"expires_at"`
+		Status    string `json:"status"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&data)
+
+	if !strings.HasPrefix(data.ShareID, "sh_") {
+		t.Fatalf("expected share_id to start with sh_, got %q", data.ShareID)
+	}
+	if !strings.Contains(data.ShareURL, "/s/gsh_") {
+		t.Fatalf("expected share_url to contain /s/gsh_, got %q", data.ShareURL)
+	}
+	if data.Status != "active" {
+		t.Fatalf("expected status active, got %q", data.Status)
+	}
+
+	// Extract share token from URL
+	shareToken := data.ShareURL[strings.LastIndex(data.ShareURL, "/")+1:]
+
+	// Access public share landing page
+	pageReq, _ := http.NewRequest(http.MethodGet, ts.URL+"/s/"+shareToken, nil)
+	pageResp, err := http.DefaultClient.Do(pageReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pageResp.Body.Close()
+	if pageResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 OK for share page, got %d", pageResp.StatusCode)
+	}
+	pageBody, _ := io.ReadAll(pageResp.Body)
+	if !strings.Contains(string(pageBody), "share_test.txt") {
+		t.Fatalf("expected share page to display filename, got body: %s", string(pageBody))
+	}
+
+	// Access public download endpoint
+	downReq, _ := http.NewRequest(http.MethodGet, ts.URL+"/s/"+shareToken+"/download", nil)
+	downResp, err := http.DefaultClient.Do(downReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer downResp.Body.Close()
+	if downResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 OK for share download, got %d", downResp.StatusCode)
+	}
+	downBody, _ := io.ReadAll(downResp.Body)
+	if string(downBody) != "share content data" {
+		t.Fatalf("expected file content 'share content data', got %q", string(downBody))
+	}
 }
 
 func TestGlobalShareValidHTTPSBaseURLAndHostHeaderIgnored(t *testing.T) {
-	t.Skip("global share HTTP endpoints reserved for future routing")
+	cfg := config.Default()
+	cfg.GlobalShareEnabled = true
+	cfg.PublicBaseURL = "https://public.hamal.io"
+	a := testAppWithConfig(t, cfg)
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	creatorToken, fileID := createRoomAndUploadFile(t, a, "ignore_host.txt", []byte("public base url test"))
+
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+creatorToken+"/files/"+fileID+"/share", strings.NewReader(`{"ttl_seconds": 3600}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Host = "attacker.evil.com"
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	var data struct {
+		ShareURL string `json:"share_url"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&data)
+
+	if !strings.HasPrefix(data.ShareURL, "https://public.hamal.io/s/gsh_") {
+		t.Fatalf("expected PublicBaseURL override, got %q", data.ShareURL)
+	}
 }
 
 func TestGlobalShareDownloadStreamingAndRange(t *testing.T) {
-	t.Skip("global share HTTP endpoints reserved for future routing")
+	cfg := config.Default()
+	cfg.GlobalShareEnabled = true
+	a := testAppWithConfig(t, cfg)
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	content := []byte("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	creatorToken, fileID := createRoomAndUploadFile(t, a, "range_test.bin", content)
+
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+creatorToken+"/files/"+fileID+"/share", nil)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var data struct {
+		ShareURL string `json:"share_url"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&data)
+	resp.Body.Close()
+
+	shareToken := data.ShareURL[strings.LastIndex(data.ShareURL, "/")+1:]
+
+	// Test Range request
+	rangeReq, _ := http.NewRequest(http.MethodGet, ts.URL+"/s/"+shareToken+"/download", nil)
+	rangeReq.Header.Set("Range", "bytes=10-19")
+	rangeResp, err := http.DefaultClient.Do(rangeReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rangeResp.Body.Close()
+
+	if rangeResp.StatusCode != http.StatusPartialContent {
+		t.Fatalf("expected 206 Partial Content, got %d", rangeResp.StatusCode)
+	}
+	rangeBody, _ := io.ReadAll(rangeResp.Body)
+	if string(rangeBody) != "ABCDEFGHIJ" {
+		t.Fatalf("expected 'ABCDEFGHIJ', got %q", string(rangeBody))
+	}
 }
 
 func TestCreatorRevokeShare(t *testing.T) {
-	t.Skip("global share HTTP endpoints reserved for future routing")
+	cfg := config.Default()
+	cfg.GlobalShareEnabled = true
+	a := testAppWithConfig(t, cfg)
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	creatorToken, fileID := createRoomAndUploadFile(t, a, "revoke_test.txt", []byte("data"))
+
+	// Create share
+	cReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+creatorToken+"/files/"+fileID+"/share", nil)
+	cResp, err := http.DefaultClient.Do(cReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var data struct {
+		ShareID  string `json:"share_id"`
+		ShareURL string `json:"share_url"`
+	}
+	_ = json.NewDecoder(cResp.Body).Decode(&data)
+	cResp.Body.Close()
+	shareToken := data.ShareURL[strings.LastIndex(data.ShareURL, "/")+1:]
+
+	// Revoke share using creator token
+	revReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+creatorToken+"/shares/"+data.ShareID+"/revoke", nil)
+	revResp, err := http.DefaultClient.Do(revReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer revResp.Body.Close()
+	if revResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 OK on revoke, got %d", revResp.StatusCode)
+	}
+
+	// Access public landing page after revocation -> 410 Gone
+	pageReq, _ := http.NewRequest(http.MethodGet, ts.URL+"/s/"+shareToken, nil)
+	pageResp, err := http.DefaultClient.Do(pageReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pageResp.Body.Close()
+	if pageResp.StatusCode != http.StatusGone {
+		t.Fatalf("expected 410 Gone after share revoked, got %d", pageResp.StatusCode)
+	}
+
+	// Access download after revocation -> 410 Gone
+	downReq, _ := http.NewRequest(http.MethodGet, ts.URL+"/s/"+shareToken+"/download", nil)
+	downResp, err := http.DefaultClient.Do(downReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer downResp.Body.Close()
+	if downResp.StatusCode != http.StatusGone {
+		t.Fatalf("expected 410 Gone for revoked download, got %d", downResp.StatusCode)
+	}
 }
 
 func TestRoomClosureInvalidatesShares(t *testing.T) {
-	t.Skip("global share HTTP endpoints reserved for future routing")
+	cfg := config.Default()
+	cfg.GlobalShareEnabled = true
+	a := testAppWithConfig(t, cfg)
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	creatorToken, fileID := createRoomAndUploadFile(t, a, "room_close.txt", []byte("room close test"))
+
+	// Create share
+	cReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+creatorToken+"/files/"+fileID+"/share", nil)
+	cResp, err := http.DefaultClient.Do(cReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var data struct {
+		ShareURL string `json:"share_url"`
+	}
+	_ = json.NewDecoder(cResp.Body).Decode(&data)
+	cResp.Body.Close()
+	shareToken := data.ShareURL[strings.LastIndex(data.ShareURL, "/")+1:]
+
+	// Close room
+	closeReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+creatorToken+"/close", nil)
+	closeResp, err := http.DefaultClient.Do(closeReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeResp.Body.Close()
+
+	// Access share page -> 410 Gone
+	pageReq, _ := http.NewRequest(http.MethodGet, ts.URL+"/s/"+shareToken, nil)
+	pageResp, err := http.DefaultClient.Do(pageReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pageResp.Body.Close()
+	if pageResp.StatusCode != http.StatusGone {
+		t.Fatalf("expected 410 Gone when room is closed, got %d", pageResp.StatusCode)
+	}
 }
 
 func TestCapabilityIsolation(t *testing.T) {
-	t.Skip("global share HTTP endpoints reserved for future routing")
+	cfg := config.Default()
+	cfg.GlobalShareEnabled = true
+	a := testAppWithConfig(t, cfg)
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	creatorToken, fileA := createRoomAndUploadFile(t, a, "fileA.txt", []byte("File A Content"))
+
+	// Upload second file B to room
+	body := &bytes.Buffer{}
+	w := multipart.NewWriter(body)
+	p, _ := w.CreateFormFile("file", "fileB.txt")
+	_, _ = p.Write([]byte("File B Secret"))
+	_ = w.Close()
+	upReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+creatorToken+"/files", body)
+	upReq.Header.Set("Content-Type", w.FormDataContentType())
+	upResp, err := http.DefaultClient.Do(upReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fDataB struct {
+		ID string `json:"file_id"`
+	}
+	_ = json.NewDecoder(upResp.Body).Decode(&fDataB)
+	upResp.Body.Close()
+
+	// Create share only for File A
+	cReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+creatorToken+"/files/"+fileA+"/share", nil)
+	cResp, err := http.DefaultClient.Do(cReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var data struct {
+		ShareURL string `json:"share_url"`
+	}
+	_ = json.NewDecoder(cResp.Body).Decode(&data)
+	cResp.Body.Close()
+	shareToken := data.ShareURL[strings.LastIndex(data.ShareURL, "/")+1:]
+
+	// Attempt to use shareToken as room token on room APIs -> must be 404
+	badReq1, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/rooms/"+shareToken+"/files", nil)
+	badResp1, err := http.DefaultClient.Do(badReq1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer badResp1.Body.Close()
+	if badResp1.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 when share token is used as room token, got %d", badResp1.StatusCode)
+	}
+
+	badReq2, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/rooms/"+shareToken+"/files/"+fDataB.ID, nil)
+	badResp2, err := http.DefaultClient.Do(badReq2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer badResp2.Body.Close()
+	if badResp2.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 accessing File B via share token, got %d", badResp2.StatusCode)
+	}
+
+	badReq3, _ := http.NewRequest(http.MethodGet, ts.URL+"/c/"+shareToken, nil)
+	badResp3, err := http.DefaultClient.Do(badReq3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer badResp3.Body.Close()
+	if badResp3.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 on /c/ with share token, got %d", badResp3.StatusCode)
+	}
 }
 
 func TestDualTierRateLimitingAndNATSharing(t *testing.T) {
-	t.Skip("global share HTTP endpoints reserved for future routing")
+	cfg := config.Default()
+	cfg.GlobalShareEnabled = true
+	cfg.ShareAccessRateLimit = 6
+	a := testAppWithConfig(t, cfg)
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	creatorToken, fileID := createRoomAndUploadFile(t, a, "ratelimit.txt", []byte("rate limited data"))
+
+	cReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+creatorToken+"/files/"+fileID+"/share", nil)
+	cResp, err := http.DefaultClient.Do(cReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var data struct {
+		ShareURL string `json:"share_url"`
+	}
+	_ = json.NewDecoder(cResp.Body).Decode(&data)
+	cResp.Body.Close()
+	shareToken := data.ShareURL[strings.LastIndex(data.ShareURL, "/")+1:]
+
+	// Trigger rate limit on share download
+	for i := 0; i < 5; i++ {
+		req, _ := http.NewRequest(http.MethodGet, ts.URL+"/s/"+shareToken+"/download", nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+
+	// 6th request from same IP should get rate limited (429)
+	limReq, _ := http.NewRequest(http.MethodGet, ts.URL+"/s/"+shareToken+"/download", nil)
+	limResp, err := http.DefaultClient.Do(limReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer limResp.Body.Close()
+	if limResp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 Too Many Requests, got %d", limResp.StatusCode)
+	}
 }
 
 func TestSafePathMasksShareTokensInLogs(t *testing.T) {
-	t.Skip("global share HTTP endpoints reserved for future routing")
+	p1 := safePath("/s/gsh_1234567890123456789012345678901234567890123456789012345678901234")
+	if p1 != "/s/:share_token" {
+		t.Errorf("expected /s/:share_token, got %q", p1)
+	}
+
+	p2 := safePath("/s/gsh_1234567890123456789012345678901234567890123456789012345678901234/download")
+	if p2 != "/s/:share_token/download" {
+		t.Errorf("expected /s/:share_token/download, got %q", p2)
+	}
+
+	p3 := safePath("/api/v1/rooms/cr_123456/files/fl_789/share")
+	if p3 != "/api/v1/rooms/:creator_token/files/:file_id/share" {
+		t.Errorf("expected /api/v1/rooms/:creator_token/files/:file_id/share, got %q", p3)
+	}
+
+	p4 := safePath("/api/v1/rooms/cr_123456/shares/sh_999/revoke")
+	if p4 != "/api/v1/rooms/:creator_token/shares/:share_id/revoke" {
+		t.Errorf("expected /api/v1/rooms/:creator_token/shares/:share_id/revoke, got %q", p4)
+	}
+}
+
+func TestMaxSharesPerRoomEnforcement(t *testing.T) {
+	cfg := config.Default()
+	cfg.GlobalShareEnabled = true
+	cfg.MaxSharesPerRoom = 2
+	a := testAppWithConfig(t, cfg)
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	creatorToken, fileID := createRoomAndUploadFile(t, a, "max_shares.txt", []byte("max shares test"))
+
+	// Share 1 -> 201 Created
+	req1, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+creatorToken+"/files/"+fileID+"/share", nil)
+	resp1, err := http.DefaultClient.Do(req1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp1.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 for share 1, got %d", resp1.StatusCode)
+	}
+	resp1.Body.Close()
+
+	// Share 2 -> 201 Created
+	req2, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+creatorToken+"/files/"+fileID+"/share", nil)
+	resp2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp2.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 for share 2, got %d", resp2.StatusCode)
+	}
+	resp2.Body.Close()
+
+	// Share 3 -> 400 Bad Request (Limit Reached)
+	req3, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+creatorToken+"/files/"+fileID+"/share", nil)
+	resp3, err := http.DefaultClient.Do(req3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp3.Body.Close()
+	if resp3.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 Bad Request for share 3 exceeding limit, got %d", resp3.StatusCode)
+	}
 }
 
 func TestRoomCreationRateLimit(t *testing.T) {

@@ -24,6 +24,7 @@ import (
 	"github.com/i1k3r/lan-drop/internal/database"
 	"github.com/i1k3r/lan-drop/internal/file"
 	"github.com/i1k3r/lan-drop/internal/room"
+	"github.com/i1k3r/lan-drop/internal/share"
 	"github.com/i1k3r/lan-drop/internal/storage"
 )
 
@@ -36,6 +37,7 @@ type App struct {
 	paths           storage.Paths
 	rooms           *room.Store
 	files           *file.Store
+	shares          *share.Store
 	cleanupWorker   *cleanup.Worker
 	logger          *slog.Logger
 	handler         http.Handler
@@ -62,6 +64,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	}
 
 	roomStore := room.NewStore(db, cfg.ServerSecret)
+	shareStore := share.NewStore(db, cfg.ServerSecret)
 	quotaManager := file.NewQuotaManager()
 	fileStore := file.NewStore(db, paths, quotaManager, file.StoreOptions{
 		MaxTotalStorage: cfg.MaxTotalStorage,
@@ -94,6 +97,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		paths:           paths,
 		rooms:           roomStore,
 		files:           fileStore,
+		shares:          shareStore,
 		cleanupWorker:   cleanupWorker,
 		logger:          logger,
 		trustedProxies:  trustedProxies,
@@ -335,6 +339,13 @@ func (a *App) baseURL(r *http.Request) string {
 	return fmt.Sprintf("%s://%s", scheme, r.Host)
 }
 
+func (a *App) shareURL(r *http.Request, token string) string {
+	if a.cfg.PublicBaseURL != "" {
+		return fmt.Sprintf("%s/s/%s", strings.TrimRight(a.cfg.PublicBaseURL, "/"), token)
+	}
+	return fmt.Sprintf("%s/s/%s", a.baseURL(r), token)
+}
+
 func (a *App) getSessionCookie(r *http.Request, roomID string) string {
 	cookieName := "landrop_session_" + roomID
 	c, err := r.Cookie(cookieName)
@@ -359,7 +370,7 @@ func (a *App) isParticipantAuthenticated(ctx context.Context, rm *room.Room, r *
 func (a *App) routes() (http.Handler, error) {
 	tmpl, err := template.ParseFS(assets, "templates/*.html")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse templates: %w", err)
 	}
 	static, err := fs.Sub(assets, "static")
 	if err != nil {
@@ -404,15 +415,17 @@ func (a *App) routes() (http.Handler, error) {
 				w.WriteHeader(http.StatusGone)
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				_ = tmpl.ExecuteTemplate(w, "creator.html", map[string]any{
-					"Year":             time.Now().Year(),
-					"CreatorToken":     token,
-					"ParticipantToken": "",
-					"ParticipantURL":   "",
-					"ExpiresAtRFC3339": "",
-					"Inactive":         true,
-					"PinRequired":      false,
-					"IsLocked":         false,
-					"Files":            []file.File{},
+					"Year":               time.Now().Year(),
+					"CreatorToken":       token,
+					"ParticipantToken":   "",
+					"ParticipantURL":     "",
+					"ExpiresAtRFC3339":   "",
+					"Inactive":           true,
+					"PinRequired":        false,
+					"IsLocked":           false,
+					"Files":              []file.File{},
+					"GlobalShareEnabled": a.cfg.GlobalShareEnabled,
+					"Shares":             []share.Share{},
 				})
 				return
 			}
@@ -433,17 +446,27 @@ func (a *App) routes() (http.Handler, error) {
 			filesList = []file.File{}
 		}
 
+		var sharesList []share.Share
+		if a.cfg.GlobalShareEnabled {
+			sharesList, _ = a.shares.ListRoomShares(r.Context(), rm.ID)
+		}
+		if sharesList == nil {
+			sharesList = []share.Share{}
+		}
+
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = tmpl.ExecuteTemplate(w, "creator.html", map[string]any{
-			"Year":             time.Now().Year(),
-			"CreatorToken":     token,
-			"ParticipantToken": participantToken,
-			"ParticipantURL":   participantURL,
-			"ExpiresAtRFC3339": rm.ExpiresAt.Format(time.RFC3339),
-			"Inactive":         false,
-			"PinRequired":      rm.PinRequired,
-			"IsLocked":         rm.IsLocked(),
-			"Files":            filesList,
+			"Year":               time.Now().Year(),
+			"CreatorToken":       token,
+			"ParticipantToken":   participantToken,
+			"ParticipantURL":     participantURL,
+			"ExpiresAtRFC3339":   rm.ExpiresAt.Format(time.RFC3339),
+			"Inactive":           false,
+			"PinRequired":        rm.PinRequired,
+			"IsLocked":           rm.IsLocked(),
+			"Files":              filesList,
+			"GlobalShareEnabled": a.cfg.GlobalShareEnabled,
+			"Shares":             sharesList,
 		})
 	})
 
@@ -1052,7 +1075,252 @@ func (a *App) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /api/v1/rooms/{token}/files/{file_id}", downloadHandler)
 	mux.HandleFunc("HEAD /api/v1/rooms/{token}/files/{file_id}", downloadHandler)
 
+	// Global Share endpoints (creator management & public download capability)
+	mux.HandleFunc("POST /api/v1/rooms/{token}/files/{file_id}/share", func(w http.ResponseWriter, r *http.Request) {
+		if !a.cfg.GlobalShareEnabled {
+			http.NotFound(w, r)
+			return
+		}
+		if !a.checkRateLimit(w, r, a.roomLimiter) {
+			return
+		}
+
+		token := r.PathValue("token")
+		fileID := r.PathValue("file_id")
+
+		rm, role, err := a.rooms.GetByToken(r.Context(), token)
+		if err != nil {
+			if errors.Is(err, room.ErrRoomNotFound) {
+				writeJSONError(w, "room not found", http.StatusNotFound)
+				return
+			}
+			if errors.Is(err, room.ErrRoomExpired) {
+				writeJSONError(w, "room has expired", http.StatusGone)
+				return
+			}
+			if errors.Is(err, room.ErrRoomClosed) {
+				writeJSONError(w, "room is closed", http.StatusGone)
+				return
+			}
+			writeJSONError(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if role != room.RoleCreator {
+			writeJSONError(w, "room not found", http.StatusNotFound)
+			return
+		}
+
+		requestedTTL := a.cfg.DefaultShareTTL
+		if r.Body != nil && r.ContentLength > 0 {
+			var payload struct {
+				TTLSeconds int `json:"ttl_seconds"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err == nil && payload.TTLSeconds > 0 {
+				requestedTTL = time.Duration(payload.TTLSeconds) * time.Second
+			}
+		}
+
+		sh, shareToken, err := a.shares.CreateShare(
+			r.Context(),
+			rm.ID,
+			fileID,
+			requestedTTL,
+			rm.ExpiresAt,
+			a.cfg.MaxShareTTL,
+			a.cfg.MaxSharesPerRoom,
+		)
+		if err != nil {
+			if errors.Is(err, file.ErrFileNotFound) {
+				writeJSONError(w, "file not found", http.StatusNotFound)
+				return
+			}
+			if errors.Is(err, share.ErrShareLimitReached) {
+				writeJSONError(w, "room share limit reached", http.StatusBadRequest)
+				return
+			}
+			if errors.Is(err, share.ErrRoomInactive) {
+				writeJSONError(w, "room is inactive", http.StatusGone)
+				return
+			}
+			a.logger.Error("failed to create share", "error", err)
+			writeJSONError(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"share_id":   sh.ID,
+			"share_url":  a.shareURL(r, shareToken),
+			"expires_at": sh.ExpiresAt.Format(time.RFC3339),
+			"status":     sh.Status,
+		})
+	})
+
+	mux.HandleFunc("POST /api/v1/rooms/{token}/shares/{share_id}/revoke", func(w http.ResponseWriter, r *http.Request) {
+		if !a.cfg.GlobalShareEnabled {
+			http.NotFound(w, r)
+			return
+		}
+		if !a.checkRateLimit(w, r, a.roomLimiter) {
+			return
+		}
+
+		token := r.PathValue("token")
+		shareID := r.PathValue("share_id")
+
+		rm, role, err := a.rooms.GetByToken(r.Context(), token)
+		if err != nil {
+			if errors.Is(err, room.ErrRoomNotFound) {
+				writeJSONError(w, "room not found", http.StatusNotFound)
+				return
+			}
+			if errors.Is(err, room.ErrRoomExpired) {
+				writeJSONError(w, "room has expired", http.StatusGone)
+				return
+			}
+			if errors.Is(err, room.ErrRoomClosed) {
+				writeJSONError(w, "room is closed", http.StatusGone)
+				return
+			}
+			writeJSONError(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if role != room.RoleCreator {
+			writeJSONError(w, "room not found", http.StatusNotFound)
+			return
+		}
+
+		err = a.shares.RevokeShare(r.Context(), rm.ID, shareID)
+		if err != nil {
+			if errors.Is(err, share.ErrShareNotFound) {
+				writeJSONError(w, "share not found", http.StatusNotFound)
+				return
+			}
+			a.logger.Error("failed to revoke share", "error", err)
+			writeJSONError(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status": "revoked",
+		})
+	})
+
+	mux.HandleFunc("GET /s/{token}", func(w http.ResponseWriter, r *http.Request) {
+		if !a.cfg.GlobalShareEnabled {
+			http.NotFound(w, r)
+			return
+		}
+		if !a.checkRateLimit(w, r, a.downloadLimiter) {
+			return
+		}
+
+		token := r.PathValue("token")
+		sh, f, err := a.shares.GetByToken(r.Context(), token)
+		if err != nil {
+			if errors.Is(err, share.ErrShareNotFound) || errors.Is(err, share.ErrInvalidToken) {
+				http.NotFound(w, r)
+				return
+			}
+			if errors.Is(err, share.ErrShareExpired) || errors.Is(err, share.ErrShareRevoked) || errors.Is(err, share.ErrRoomInactive) {
+				w.WriteHeader(http.StatusGone)
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				_ = tmpl.ExecuteTemplate(w, "share.html", map[string]any{
+					"Year":             time.Now().Year(),
+					"ShareToken":       token,
+					"ExpiresAtRFC3339": "",
+					"Filename":         "",
+					"FormattedSize":    "",
+					"ContentType":      "",
+					"Inactive":         true,
+				})
+				return
+			}
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = tmpl.ExecuteTemplate(w, "share.html", map[string]any{
+			"Year":             time.Now().Year(),
+			"ShareToken":       token,
+			"ExpiresAtRFC3339": sh.ExpiresAt.Format(time.RFC3339),
+			"Filename":         f.OriginalFilename,
+			"FormattedSize":    formatBytes(f.SizeBytes),
+			"ContentType":      f.ContentType,
+			"Inactive":         false,
+		})
+	})
+
+	shareDownloadHandler := func(w http.ResponseWriter, r *http.Request) {
+		if !a.cfg.GlobalShareEnabled {
+			http.NotFound(w, r)
+			return
+		}
+		if !a.checkRateLimit(w, r, a.downloadLimiter) {
+			return
+		}
+
+		token := r.PathValue("token")
+		_, f, err := a.shares.GetByToken(r.Context(), token)
+		if err != nil {
+			if errors.Is(err, share.ErrShareNotFound) || errors.Is(err, share.ErrInvalidToken) {
+				http.NotFound(w, r)
+				return
+			}
+			if errors.Is(err, share.ErrShareExpired) || errors.Is(err, share.ErrShareRevoked) || errors.Is(err, share.ErrRoomInactive) {
+				writeJSONError(w, "share has expired or is inactive", http.StatusGone)
+				return
+			}
+			writeJSONError(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		storageFile, err := a.files.OpenStorageFile(f.StorageID)
+		if err != nil {
+			if errors.Is(err, file.ErrFileNotFound) || errors.Is(err, file.ErrInvalidFilename) {
+				a.logger.Error("share storage object missing on disk", "storage_id", f.StorageID, "error", err)
+				writeJSONError(w, "file not found", http.StatusNotFound)
+				return
+			}
+			a.logger.Error("failed to open share storage file", "error", err)
+			writeJSONError(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		defer storageFile.Close()
+
+		w.Header().Set("Content-Type", f.ContentType)
+		w.Header().Set("Content-Disposition", file.SanitizeContentDisposition(f.OriginalFilename))
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "private, no-transform, max-age=0, must-revalidate")
+
+		http.ServeContent(w, r, f.OriginalFilename, f.CreatedAt, storageFile)
+	}
+
+	mux.HandleFunc("GET /s/{token}/download", shareDownloadHandler)
+	mux.HandleFunc("HEAD /s/{token}/download", shareDownloadHandler)
+
 	return requestLogging(mux, a.logger), nil
+}
+
+func formatBytes(bytes int64) string {
+	if bytes <= 0 {
+		return "0 Bytes"
+	}
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d Bytes", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
 func writeJSONError(w http.ResponseWriter, message string, statusCode int) {

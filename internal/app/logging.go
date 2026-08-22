@@ -42,6 +42,13 @@ func safePath(path string) string {
 	if strings.HasPrefix(path, "/c/") {
 		return "/c/:creator_token"
 	}
+	if strings.HasPrefix(path, "/s/") {
+		sub := strings.TrimPrefix(path, "/s/")
+		if strings.HasSuffix(sub, "/download") {
+			return "/s/:share_token/download"
+		}
+		return "/s/:share_token"
+	}
 	if strings.HasPrefix(path, "/api/v1/rooms/") {
 		sub := strings.TrimPrefix(path, "/api/v1/rooms/")
 		if strings.HasSuffix(sub, "/close") {
@@ -57,7 +64,13 @@ func safePath(path string) string {
 			return "/api/v1/rooms/:room_token/qr.svg"
 		}
 		if strings.Contains(sub, "/files/") {
+			if strings.HasSuffix(sub, "/share") {
+				return "/api/v1/rooms/:creator_token/files/:file_id/share"
+			}
 			return "/api/v1/rooms/:room_token/files/:file_id"
+		}
+		if strings.Contains(sub, "/shares/") && strings.HasSuffix(sub, "/revoke") {
+			return "/api/v1/rooms/:creator_token/shares/:share_id/revoke"
 		}
 		if strings.HasSuffix(sub, "/files") {
 			return "/api/v1/rooms/:room_token/files"
