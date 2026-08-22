@@ -84,6 +84,81 @@ func (qm *QuotaManager) Acquire(
 	return resID, nil
 }
 
+// Grow atomically increases an active reservation by additionalBytes, validating
+// that the expansion does not exceed room capacity or global capacity.
+func (qm *QuotaManager) Grow(
+	reservationID string,
+	additionalBytes int64,
+	currentRoomUsage int64,
+	maxRoomSize int64,
+	currentGlobalUsage int64,
+	maxTotalStorage int64,
+) error {
+	if additionalBytes <= 0 {
+		return nil
+	}
+
+	qm.mu.Lock()
+	defer qm.mu.Unlock()
+
+	res, exists := qm.reservations[reservationID]
+	if !exists {
+		return errors.New("reservation not found")
+	}
+
+	// 1. Check per-room quota
+	activeRoomReserved := qm.roomReserved[res.roomID]
+	if currentRoomUsage+activeRoomReserved+additionalBytes > maxRoomSize {
+		return ErrQuotaExceeded
+	}
+
+	// 2. Check global quota (if maxTotalStorage > 0)
+	if maxTotalStorage > 0 {
+		if currentGlobalUsage+qm.totalReserved+additionalBytes > maxTotalStorage {
+			return ErrGlobalStorageExceeded
+		}
+	}
+
+	res.bytes += additionalBytes
+	qm.reservations[reservationID] = res
+	qm.roomReserved[res.roomID] = activeRoomReserved + additionalBytes
+	qm.totalReserved += additionalBytes
+
+	return nil
+}
+
+// Shrink atomically reduces an active reservation to targetBytes (if targetBytes < current reservation).
+func (qm *QuotaManager) Shrink(reservationID string, targetBytes int64) {
+	if targetBytes < 0 {
+		targetBytes = 0
+	}
+
+	qm.mu.Lock()
+	defer qm.mu.Unlock()
+
+	res, exists := qm.reservations[reservationID]
+	if !exists {
+		return
+	}
+
+	if targetBytes >= res.bytes {
+		return
+	}
+
+	delta := res.bytes - targetBytes
+	res.bytes = targetBytes
+	qm.reservations[reservationID] = res
+
+	qm.roomReserved[res.roomID] -= delta
+	if qm.roomReserved[res.roomID] <= 0 {
+		delete(qm.roomReserved, res.roomID)
+	}
+	qm.totalReserved -= delta
+	if qm.totalReserved <= 0 {
+		qm.totalReserved = 0
+	}
+}
+
 // Release frees an active reservation when an upload finishes or fails.
 func (qm *QuotaManager) Release(reservationID string) {
 	qm.mu.Lock()

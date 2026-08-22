@@ -2231,3 +2231,174 @@ func TestNormalLargeUploadStreamsSuccessfully(t *testing.T) {
 		t.Fatalf("expected size %d bytes, got %d", expectedSize, fileData.SizeBytes)
 	}
 }
+
+func TestConcurrentChunkedUploadsNoFalseRejectionHTTP(t *testing.T) {
+	cfg := config.Default()
+	cfg.MaxRoomSize = 10 * 1024 * 1024 // 10 MB room
+	cfg.MaxFileSize = 8 * 1024 * 1024  // 8 MB max file
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	createReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := http.DefaultClient.Do(createReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	// Launch two concurrent 4 MB chunked HTTP uploads
+	var wg sync.WaitGroup
+	errCh := make(chan error, 2)
+
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			pr, pw := io.Pipe()
+			writer := multipart.NewWriter(pw)
+			go func() {
+				part, err := writer.CreateFormFile("file", fmt.Sprintf("chunked_%d.bin", idx))
+				if err != nil {
+					pw.CloseWithError(err)
+					return
+				}
+				buf := bytes.Repeat([]byte("C"), 64*1024)
+				for j := 0; j < 64; j++ { // 64 * 64KB = 4 MB
+					if _, err := part.Write(buf); err != nil {
+						pw.CloseWithError(err)
+						return
+					}
+				}
+				_ = writer.Close()
+				_ = pw.Close()
+			}()
+
+			upReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", pr)
+			upReq.Header.Set("Content-Type", writer.FormDataContentType())
+			upResp, err := http.DefaultClient.Do(upReq)
+			if err != nil {
+				errCh <- fmt.Errorf("upload %d request failed: %w", idx, err)
+				return
+			}
+			defer upResp.Body.Close()
+
+			if upResp.StatusCode != http.StatusCreated {
+				b, _ := io.ReadAll(upResp.Body)
+				errCh <- fmt.Errorf("upload %d got status %d: %s", idx, upResp.StatusCode, string(b))
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Fatalf("unexpected concurrent upload failure: %v", err)
+	}
+}
+
+func TestUnderDeclaredContentLengthHTTPBlocked(t *testing.T) {
+	cfg := config.Default()
+	cfg.MaxRoomSize = 1024 * 1024 // 1 MB room
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	createReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, _ := http.DefaultClient.Do(createReq)
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	// Stream 2 MB of data into 1 MB room
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+	go func() {
+		part, _ := writer.CreateFormFile("file", "under_declared.bin")
+		buf := bytes.Repeat([]byte("U"), 64*1024)
+		for j := 0; j < 32; j++ { // 32 * 64KB = 2 MB
+			if _, err := part.Write(buf); err != nil {
+				break
+			}
+		}
+		_ = writer.Close()
+		_ = pw.Close()
+	}()
+
+	upReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", pr)
+	upReq.Header.Set("Content-Type", writer.FormDataContentType())
+	upResp, err := http.DefaultClient.Do(upReq)
+	if err == nil {
+		defer upResp.Body.Close()
+		if upResp.StatusCode != http.StatusRequestEntityTooLarge && upResp.StatusCode != http.StatusBadRequest && upResp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected 413 or error status for exceeding room limit, got %d", upResp.StatusCode)
+		}
+	}
+}
+
+func TestOverDeclaredContentLengthHTTPNoStarvation(t *testing.T) {
+	cfg := config.Default()
+	cfg.MaxRoomSize = 10 * 1024 * 1024 // 10 MB room
+	cfg.MinFreeSpace = 0
+	a := testAppWithConfig(t, cfg)
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	createReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms", strings.NewReader(`{"ttl_seconds": 3600}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, _ := http.DefaultClient.Do(createReq)
+	var roomData struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomData)
+	createResp.Body.Close()
+
+	// Upload 1: 10 KB file
+	body1 := &bytes.Buffer{}
+	w1 := multipart.NewWriter(body1)
+	p1, _ := w1.CreateFormFile("file", "small.txt")
+	_, _ = p1.Write(bytes.Repeat([]byte("S"), 10*1024))
+	_ = w1.Close()
+
+	upReq1, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", body1)
+	upReq1.Header.Set("Content-Type", w1.FormDataContentType())
+	upResp1, err := http.DefaultClient.Do(upReq1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer upResp1.Body.Close()
+	if upResp1.StatusCode != http.StatusCreated {
+		t.Fatalf("upload 1 failed: %d", upResp1.StatusCode)
+	}
+
+	// Upload 2: 5 MB file
+	body2 := &bytes.Buffer{}
+	w2 := multipart.NewWriter(body2)
+	p2, _ := w2.CreateFormFile("file", "five_mb.bin")
+	_, _ = p2.Write(bytes.Repeat([]byte("F"), 5*1024*1024))
+	_ = w2.Close()
+
+	upReq2, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomData.ParticipantToken+"/files", body2)
+	upReq2.Header.Set("Content-Type", w2.FormDataContentType())
+	upResp2, err := http.DefaultClient.Do(upReq2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer upResp2.Body.Close()
+	if upResp2.StatusCode != http.StatusCreated {
+		t.Fatalf("upload 2 failed: %d", upResp2.StatusCode)
+	}
+}

@@ -317,26 +317,33 @@ func (s *Store) StreamUpload(
 		}
 	}
 
-	// 4. Calculate reservation size bounded by limits
-	reservationSize := declaredSize
-	if reservationSize <= 0 {
-		reservationSize = maxFileSize
-		if reservationSize > remainingRoomQuota {
-			reservationSize = remainingRoomQuota
-		}
-		if s.maxTotalStorage > 0 {
-			remainingGlobal := s.maxTotalStorage - currentGlobalUsage
-			if remainingGlobal > 0 && reservationSize > remainingGlobal {
-				reservationSize = remainingGlobal
-			}
+	// 4. Calculate initial bounded reservation
+	const InitialQuotaChunk = int64(64 * 1024)
+	const QuotaGrowthChunk = int64(1024 * 1024)
+
+	initialReservation := InitialQuotaChunk
+	if declaredSize > 0 && declaredSize < initialReservation {
+		initialReservation = declaredSize
+	}
+	if initialReservation > remainingRoomQuota {
+		initialReservation = remainingRoomQuota
+	}
+	if initialReservation > maxFileSize {
+		initialReservation = maxFileSize
+	}
+	if s.maxTotalStorage > 0 {
+		remainingGlobal := s.maxTotalStorage - currentGlobalUsage
+		if remainingGlobal > 0 && initialReservation > remainingGlobal {
+			initialReservation = remainingGlobal
 		}
 	}
 
-	// 5. Acquire atomic quota reservation
-	resID, err := s.quota.Acquire(roomID, reservationSize, currentUsage, maxRoomSize, currentGlobalUsage, s.maxTotalStorage)
+	// 5. Acquire atomic initial quota reservation
+	resID, err := s.quota.Acquire(roomID, initialReservation, currentUsage, maxRoomSize, currentGlobalUsage, s.maxTotalStorage)
 	if err != nil {
 		return nil, err
 	}
+	reservedBytes := initialReservation
 	resReleased := false
 	defer func() {
 		if !resReleased {
@@ -371,20 +378,7 @@ func (s *Store) StreamUpload(
 		}
 	}()
 
-	// Maximum allowable bytes for this specific stream
-	remainingQuota := maxRoomSize - currentUsage
-	allowedBytes := maxFileSize
-	if remainingQuota < allowedBytes {
-		allowedBytes = remainingQuota
-	}
-	if s.maxTotalStorage > 0 {
-		remainingGlobal := s.maxTotalStorage - currentGlobalUsage
-		if remainingGlobal < allowedBytes {
-			allowedBytes = remainingGlobal
-		}
-	}
-
-	// Stream with buffer and limit check
+	// Stream with buffer and dynamic quota growth
 	buf := make([]byte, 32*1024)
 	var written int64
 	var headerBuf []byte
@@ -393,14 +387,36 @@ func (s *Store) StreamUpload(
 	for {
 		n, readErr := r.Read(buf)
 		if n > 0 {
-			if written+int64(n) > allowedBytes {
-				if s.maxTotalStorage > 0 && written+int64(n) > s.maxTotalStorage-currentGlobalUsage {
-					return nil, ErrGlobalStorageExceeded
-				}
-				if written+int64(n) > remainingQuota {
-					return nil, ErrQuotaExceeded
-				}
+			if written+int64(n) > maxFileSize {
 				return nil, ErrFileTooLarge
+			}
+
+			// Dynamically grow reservation if incoming data exceeds currently reserved quota
+			if written+int64(n) > reservedBytes {
+				needed := written + int64(n) - reservedBytes
+				growDelta := QuotaGrowthChunk
+				if needed > growDelta {
+					growDelta = needed
+				}
+				// Clamp growDelta to available headroom so we don't over-request beyond available room/global limits
+				remainingInRoom := maxRoomSize - (currentUsage + reservedBytes)
+				if remainingInRoom >= needed && growDelta > remainingInRoom {
+					growDelta = remainingInRoom
+				}
+				if s.maxTotalStorage > 0 {
+					remainingInGlobal := s.maxTotalStorage - (currentGlobalUsage + reservedBytes)
+					if remainingInGlobal >= needed && growDelta > remainingInGlobal {
+						growDelta = remainingInGlobal
+					}
+				}
+				if remainingInFile := maxFileSize - reservedBytes; remainingInFile >= needed && growDelta > remainingInFile {
+					growDelta = remainingInFile
+				}
+
+				if err := s.quota.Grow(resID, growDelta, currentUsage, maxRoomSize, currentGlobalUsage, s.maxTotalStorage); err != nil {
+					return nil, err
+				}
+				reservedBytes += growDelta
 			}
 
 			if !headerCollected {
@@ -436,6 +452,11 @@ func (s *Store) StreamUpload(
 	if written == 0 {
 		_ = os.Remove(stagingPath)
 		return nil, ErrEmptyFile
+	}
+
+	// Shrink reservation to exact written size prior to DB commit
+	if reservedBytes > written {
+		s.quota.Shrink(resID, written)
 	}
 
 	contentType := strings.TrimSpace(declaredContentType)

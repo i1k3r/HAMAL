@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -872,4 +873,324 @@ func (r *errReader) Read(p []byte) (int, error) {
 	}
 	r.off += n
 	return n, nil
+}
+
+func TestQuotaManagerGrowAndShrinkUnit(t *testing.T) {
+	qm := NewQuotaManager()
+	roomID := "room-grow-shrink"
+
+	// 1. Acquire 100 bytes
+	resID, err := qm.Acquire(roomID, 100, 0, 500, 0, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if qm.GetActiveReserved(roomID) != 100 || qm.GetTotalActiveReserved() != 100 {
+		t.Fatalf("expected 100 bytes reserved, got room=%d, total=%d", qm.GetActiveReserved(roomID), qm.GetTotalActiveReserved())
+	}
+
+	// 2. Grow by 200 bytes (total 300 <= 500)
+	err = qm.Grow(resID, 200, 0, 500, 0, 1000)
+	if err != nil {
+		t.Fatalf("grow failed: %v", err)
+	}
+	if qm.GetActiveReserved(roomID) != 300 || qm.GetTotalActiveReserved() != 300 {
+		t.Fatalf("expected 300 bytes reserved after grow, got %d", qm.GetActiveReserved(roomID))
+	}
+
+	// 3. Grow exceeding room quota (300 + 300 = 600 > 500) -> must fail
+	err = qm.Grow(resID, 300, 0, 500, 0, 1000)
+	if !errors.Is(err, ErrQuotaExceeded) {
+		t.Fatalf("expected ErrQuotaExceeded, got %v", err)
+	}
+	// Reservation must remain unchanged at 300
+	if qm.GetActiveReserved(roomID) != 300 {
+		t.Fatalf("expected reservation to remain 300 after failed grow, got %d", qm.GetActiveReserved(roomID))
+	}
+
+	// 4. Shrink from 300 down to 150 bytes
+	qm.Shrink(resID, 150)
+	if qm.GetActiveReserved(roomID) != 150 || qm.GetTotalActiveReserved() != 150 {
+		t.Fatalf("expected 150 bytes reserved after shrink, got room=%d, total=%d", qm.GetActiveReserved(roomID), qm.GetTotalActiveReserved())
+	}
+
+	// 5. Release
+	qm.Release(resID)
+	if qm.GetActiveReserved(roomID) != 0 || qm.GetTotalActiveReserved() != 0 {
+		t.Fatalf("expected 0 bytes reserved after release, got room=%d, total=%d", qm.GetActiveReserved(roomID), qm.GetTotalActiveReserved())
+	}
+}
+
+func TestConcurrentSmallUploadsNoFalseRejection(t *testing.T) {
+	dataDir := t.TempDir()
+	paths, err := storage.Initialize(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Open(filepath.Join(dataDir, "lan-drop.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	secret := "test-secret-must-be-at-least-32-bytes-long"
+	roomStore := room.NewStore(db, secret)
+	qm := NewQuotaManager()
+	store := NewStore(db, paths, qm, StoreOptions{})
+
+	ctx := context.Background()
+	// Room capacity: 10 MB, MaxFileSize: 8 MB
+	maxRoom := int64(10 * 1024 * 1024)
+	maxFile := int64(8 * 1024 * 1024)
+	r, err := roomStore.Create(ctx, time.Hour, maxRoom, maxFile, 10, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// In old code with declaredSize=0:
+	// Upload 1 reserved 8 MB (maxFile). Upload 2 tried to reserve 8 MB and failed (8+8 > 10 MB).
+	// In new dynamic code: Both 4 MB uploads stream concurrently and both succeed (4+4 = 8 <= 10 MB).
+	var wg sync.WaitGroup
+	errCh := make(chan error, 2)
+
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			payload := bytes.Repeat([]byte("X"), 4*1024*1024)
+			// declaredSize = 0 (simulating chunked / unknown size)
+			_, err := store.StreamUpload(ctx, r.ID, fmt.Sprintf("file_%d.bin", idx), "application/octet-stream", bytes.NewReader(payload), 0, maxFile, maxRoom, 10)
+			if err != nil {
+				errCh <- fmt.Errorf("upload %d failed: %w", idx, err)
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Fatalf("unexpected concurrent upload rejection: %v", err)
+	}
+
+	// Verify both files exist in room
+	files, err := store.ListReadyFiles(ctx, r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("expected 2 files in room, got %d", len(files))
+	}
+}
+
+func TestChunkedUploadDynamicQuotaGrowth(t *testing.T) {
+	dataDir := t.TempDir()
+	paths, err := storage.Initialize(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Open(filepath.Join(dataDir, "lan-drop.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	secret := "test-secret-must-be-at-least-32-bytes-long"
+	roomStore := room.NewStore(db, secret)
+	qm := NewQuotaManager()
+	store := NewStore(db, paths, qm, StoreOptions{})
+
+	ctx := context.Background()
+	r, err := roomStore.Create(ctx, time.Hour, 5*1024*1024, 5*1024*1024, 5, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload 3 MB with declaredSize = 0 -> starts with 64 KB, dynamically grows to 3 MB
+	payload := bytes.Repeat([]byte("Z"), 3*1024*1024)
+	uploaded, err := store.StreamUpload(ctx, r.ID, "chunked.bin", "application/octet-stream", bytes.NewReader(payload), 0, 5*1024*1024, 5*1024*1024, 5)
+	if err != nil {
+		t.Fatalf("chunked stream upload failed: %v", err)
+	}
+	if uploaded.SizeBytes != int64(len(payload)) {
+		t.Fatalf("expected size %d, got %d", len(payload), uploaded.SizeBytes)
+	}
+
+	// Verify active reservations are 0 after completion
+	if qm.GetActiveReserved(r.ID) != 0 || qm.GetTotalActiveReserved() != 0 {
+		t.Fatalf("expected 0 reserved after upload, got room=%d, total=%d", qm.GetActiveReserved(r.ID), qm.GetTotalActiveReserved())
+	}
+}
+
+func TestUnderDeclaredContentLengthPreventedFromQuotaBypass(t *testing.T) {
+	dataDir := t.TempDir()
+	paths, err := storage.Initialize(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Open(filepath.Join(dataDir, "lan-drop.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	secret := "test-secret-must-be-at-least-32-bytes-long"
+	roomStore := room.NewStore(db, secret)
+	qm := NewQuotaManager()
+	store := NewStore(db, paths, qm, StoreOptions{})
+
+	ctx := context.Background()
+	// Room capacity: 1 MB
+	r, err := roomStore.Create(ctx, time.Hour, 1024*1024, 1024*1024, 5, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Client declares 100 bytes, but attempts to stream 2 MB into a 1 MB room
+	payload := bytes.Repeat([]byte("E"), 2*1024*1024)
+	_, err = store.StreamUpload(ctx, r.ID, "evil.bin", "application/octet-stream", bytes.NewReader(payload), 100, 1024*1024, 1024*1024, 5)
+	if !errors.Is(err, ErrQuotaExceeded) && !errors.Is(err, ErrFileTooLarge) {
+		t.Fatalf("expected quota error when actual size exceeds room limit, got %v", err)
+	}
+
+	// Verify no file recorded in DB and reservation released
+	files, err := store.ListReadyFiles(ctx, r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 0 {
+		t.Fatalf("expected 0 files in room, got %d", len(files))
+	}
+	if qm.GetActiveReserved(r.ID) != 0 {
+		t.Fatalf("expected 0 reserved after failure, got %d", qm.GetActiveReserved(r.ID))
+	}
+}
+
+func TestOverDeclaredContentLengthDoesNotStarveRoom(t *testing.T) {
+	dataDir := t.TempDir()
+	paths, err := storage.Initialize(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Open(filepath.Join(dataDir, "lan-drop.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	secret := "test-secret-must-be-at-least-32-bytes-long"
+	roomStore := room.NewStore(db, secret)
+	qm := NewQuotaManager()
+	store := NewStore(db, paths, qm, StoreOptions{})
+
+	ctx := context.Background()
+	// Room capacity: 10 MB
+	r, err := roomStore.Create(ctx, time.Hour, 10*1024*1024, 10*1024*1024, 5, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload 1 declares 500 MB (over-declared) but sends only 10 KB
+	// Initial reservation is capped at 64 KB, not 500 MB
+	payload1 := bytes.Repeat([]byte("A"), 10*1024)
+	_, err = store.StreamUpload(ctx, r.ID, "small.bin", "application/octet-stream", bytes.NewReader(payload1), 500*1024*1024, 10*1024*1024, 10*1024*1024, 5)
+	if err != nil {
+		t.Fatalf("over-declared upload failed: %v", err)
+	}
+
+	// Upload 2 sends 5 MB -> must succeed because Upload 1 did not lock the entire room
+	payload2 := bytes.Repeat([]byte("B"), 5*1024*1024)
+	_, err = store.StreamUpload(ctx, r.ID, "five_mb.bin", "application/octet-stream", bytes.NewReader(payload2), int64(len(payload2)), 10*1024*1024, 10*1024*1024, 5)
+	if err != nil {
+		t.Fatalf("subsequent upload failed: %v", err)
+	}
+}
+
+func TestCompetingUploadsAtomicRace(t *testing.T) {
+	dataDir := t.TempDir()
+	paths, err := storage.Initialize(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Open(filepath.Join(dataDir, "lan-drop.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	secret := "test-secret-must-be-at-least-32-bytes-long"
+	roomStore := room.NewStore(db, secret)
+	qm := NewQuotaManager()
+	store := NewStore(db, paths, qm, StoreOptions{})
+
+	ctx := context.Background()
+	// Room capacity: 80 KB
+	r, err := roomStore.Create(ctx, time.Hour, 80*1024, 80*1024, 5, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Two 60 KB uploads start simultaneously (60 + 60 = 120 > 80 KB)
+	var wg sync.WaitGroup
+	var successCount int
+	var failCount int
+	var mu sync.Mutex
+
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			payload := bytes.Repeat([]byte("R"), 60*1024)
+			_, err := store.StreamUpload(ctx, r.ID, fmt.Sprintf("race_%d.bin", idx), "application/octet-stream", bytes.NewReader(payload), 0, 80*1024, 80*1024, 5)
+			mu.Lock()
+			if err == nil {
+				successCount++
+			} else if errors.Is(err, ErrQuotaExceeded) || errors.Is(err, ErrFileTooLarge) {
+				failCount++
+			}
+			mu.Unlock()
+		}(i)
+	}
+	wg.Wait()
+
+	if successCount != 1 || failCount != 1 {
+		t.Fatalf("expected exactly 1 success and 1 failure, got success=%d, fail=%d", successCount, failCount)
+	}
+
+	// Total usage in DB must be exactly 60 KB (<= 80 KB)
+	usage, count, err := store.GetRoomUsageAndCount(ctx, r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 || usage != 60*1024 {
+		t.Fatalf("expected 1 file and 60KB usage, got count=%d, usage=%d", count, usage)
+	}
+}
+
+func TestStoreQuotaConcurrencyStressRace(t *testing.T) {
+	qm := NewQuotaManager()
+	maxRoom := int64(10000)
+	maxGlobal := int64(50000)
+	var wg sync.WaitGroup
+
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			roomID := fmt.Sprintf("room_%d", idx%5)
+			resID, err := qm.Acquire(roomID, 100, 0, maxRoom, 0, maxGlobal)
+			if err != nil {
+				return
+			}
+			// Attempt to grow
+			_ = qm.Grow(resID, 50, 0, maxRoom, 0, maxGlobal)
+			// Shrink
+			qm.Shrink(resID, 80)
+			// Release
+			qm.Release(resID)
+		}(i)
+	}
+	wg.Wait()
+
+	if qm.GetTotalActiveReserved() != 0 {
+		t.Fatalf("expected 0 total reserved after stress test, got %d", qm.GetTotalActiveReserved())
+	}
 }
