@@ -1,6 +1,6 @@
-# LAN-Drop MVP Architecture
+# HAMAL Architecture
 
-LAN-Drop is a single-container, self-hosted temporary sharing service. The approved MVP architecture uses a Go server, server-rendered templates with small vanilla JavaScript enhancements, SQLite metadata, and opaque filesystem storage under one persistent `/data` mount.
+HAMAL is a single-container, self-hosted temporary local file courier service. The architecture uses a Go server, server-rendered templates with vanilla JavaScript enhancements, SQLite metadata, and opaque filesystem storage under one persistent `/data` mount.
 
 ## Foundation scope
 

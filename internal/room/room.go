@@ -26,6 +26,7 @@ type Room struct {
 	ExpiresAt            time.Time  `json:"expires_at"`
 	TTLSeconds           int        `json:"ttl_seconds"`
 	Status               string     `json:"status"`
+	CloseDeadline        *time.Time `json:"close_deadline,omitempty"`
 	PinRequired          bool       `json:"pin_required"`
 	PinHash              string     `json:"-"`
 	PinSalt              string     `json:"-"`
@@ -34,6 +35,21 @@ type Room struct {
 	MaxRoomSize          int64      `json:"max_room_size"`
 	MaxFileSize          int64      `json:"max_file_size"`
 	MaxFiles             int        `json:"max_files"`
+}
+
+func (r *Room) IsClosing() bool {
+	return r.Status == "closing"
+}
+
+func (r *Room) ClosingRemainingSeconds() int {
+	if r.CloseDeadline == nil || r.Status != "closing" {
+		return 0
+	}
+	rem := int(time.Until(*r.CloseDeadline).Seconds() + 0.999)
+	if rem < 0 {
+		return 0
+	}
+	return rem
 }
 
 func (r *Room) IsLocked() bool {
@@ -164,7 +180,7 @@ func (s *Store) GetByToken(ctx context.Context, rawToken string) (*Room, Role, e
 
 	query := `
 		SELECT id, creator_token_hash, participant_token_hash,
-		       created_at, expires_at, ttl_seconds, status,
+		       created_at, expires_at, ttl_seconds, status, close_deadline,
 		       pin_required, pin_hash, pin_salt, pin_attempts, locked_until,
 		       max_room_size, max_file_size, max_files
 		FROM rooms
@@ -173,7 +189,7 @@ func (s *Store) GetByToken(ctx context.Context, rawToken string) (*Room, Role, e
 
 	var r Room
 	var createdAtStr, expiresAtStr string
-	var pinHashNull, pinSaltNull, lockedUntilNull sql.NullString
+	var pinHashNull, pinSaltNull, lockedUntilNull, closeDeadlineNull sql.NullString
 	var pinRequiredInt, pinAttempts int
 
 	err := s.db.QueryRowContext(ctx, query, tokenHash, tokenHash).Scan(
@@ -184,6 +200,7 @@ func (s *Store) GetByToken(ctx context.Context, rawToken string) (*Room, Role, e
 		&expiresAtStr,
 		&r.TTLSeconds,
 		&r.Status,
+		&closeDeadlineNull,
 		&pinRequiredInt,
 		&pinHashNull,
 		&pinSaltNull,
@@ -206,6 +223,11 @@ func (s *Store) GetByToken(ctx context.Context, rawToken string) (*Room, Role, e
 	if t, err := time.Parse(time.RFC3339, expiresAtStr); err == nil {
 		r.ExpiresAt = t
 	}
+	if closeDeadlineNull.Valid && closeDeadlineNull.String != "" {
+		if t, err := time.Parse(time.RFC3339, closeDeadlineNull.String); err == nil {
+			r.CloseDeadline = &t
+		}
+	}
 	r.PinRequired = (pinRequiredInt == 1)
 	r.PinHash = pinHashNull.String
 	r.PinSalt = pinSaltNull.String
@@ -227,7 +249,17 @@ func (s *Store) GetByToken(ctx context.Context, rawToken string) (*Room, Role, e
 		return &r, role, ErrRoomClosed
 	}
 
+	if r.Status == "closing" {
+		if r.CloseDeadline != nil && (time.Now().UTC().After(*r.CloseDeadline) || time.Now().UTC().Equal(*r.CloseDeadline)) {
+			_, _ = s.db.ExecContext(ctx, `UPDATE rooms SET status = 'closed' WHERE id = ? AND status = 'closing'`, r.ID)
+			r.Status = "closed"
+			return &r, role, ErrRoomClosed
+		}
+		return &r, role, nil
+	}
+
 	if time.Now().UTC().After(r.ExpiresAt) {
+		_, _ = s.db.ExecContext(ctx, `UPDATE rooms SET status = 'expired' WHERE id = ? AND status = 'active'`, r.ID)
 		r.Status = "expired"
 		return &r, role, ErrRoomExpired
 	}
@@ -398,13 +430,109 @@ func (s *Store) ValidateSession(ctx context.Context, roomID, rawSessionToken str
 	return count > 0, nil
 }
 
+// StartClosing transitions an active room to 'closing' with a server-authoritative deadline.
+// If already 'closing', it returns the existing closing room without resetting or extending the countdown.
+// If already 'closed', it returns the closed room with ErrRoomClosed.
+func (s *Store) StartClosing(ctx context.Context, roomID string, duration time.Duration) (*Room, error) {
+	if duration <= 0 {
+		duration = 10 * time.Second
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	var status string
+	var expiresAtStr string
+	var closeDeadlineNull sql.NullString
+	var maxRoomSize, maxFileSize int64
+	var maxFiles int
+	var pinRequiredInt int
+	err = tx.QueryRowContext(ctx, "SELECT status, expires_at, close_deadline, max_room_size, max_file_size, max_files, pin_required FROM rooms WHERE id = ?", roomID).Scan(
+		&status, &expiresAtStr, &closeDeadlineNull, &maxRoomSize, &maxFileSize, &maxFiles, &pinRequiredInt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrRoomNotFound
+		}
+		return nil, fmt.Errorf("query room status: %w", err)
+	}
+
+	expiresAt, _ := time.Parse(time.RFC3339, expiresAtStr)
+
+	if status == "closed" {
+		return &Room{ID: roomID, Status: "closed"}, ErrRoomClosed
+	}
+
+	if status == "closing" {
+		var closeDeadline *time.Time
+		if closeDeadlineNull.Valid && closeDeadlineNull.String != "" {
+			if t, err := time.Parse(time.RFC3339, closeDeadlineNull.String); err == nil {
+				closeDeadline = &t
+				if time.Now().UTC().After(t) || time.Now().UTC().Equal(t) {
+					_, _ = tx.ExecContext(ctx, `UPDATE rooms SET status = 'closed' WHERE id = ? AND status = 'closing'`, roomID)
+					_ = tx.Commit()
+					return &Room{ID: roomID, Status: "closed"}, ErrRoomClosed
+				}
+			}
+		}
+		_ = tx.Commit()
+		return &Room{
+			ID:            roomID,
+			Status:        "closing",
+			CloseDeadline: closeDeadline,
+			ExpiresAt:     expiresAt,
+			MaxRoomSize:   maxRoomSize,
+			MaxFileSize:   maxFileSize,
+			MaxFiles:      maxFiles,
+			PinRequired:   (pinRequiredInt == 1),
+		}, nil
+	}
+
+	now := time.Now().UTC()
+	deadline := now.Add(duration)
+	if !expiresAt.IsZero() && deadline.After(expiresAt) {
+		deadline = expiresAt
+	}
+	deadlineStr := deadline.Format(time.RFC3339)
+
+	res, err := tx.ExecContext(ctx, `UPDATE rooms SET status = 'closing', close_deadline = ? WHERE id = ? AND status = 'active'`, deadlineStr, roomID)
+	if err != nil {
+		return nil, fmt.Errorf("update room closing: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if rows == 0 {
+		return nil, ErrRoomNotFound
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &Room{
+		ID:            roomID,
+		Status:        "closing",
+		CloseDeadline: &deadline,
+		ExpiresAt:     expiresAt,
+		MaxRoomSize:   maxRoomSize,
+		MaxFileSize:   maxFileSize,
+		MaxFiles:      maxFiles,
+		PinRequired:   (pinRequiredInt == 1),
+	}, nil
+}
+
 func (s *Store) Close(ctx context.Context, creatorToken string) error {
 	creatorHash := HashToken(s.serverSecret, creatorToken)
 
 	query := `
 		UPDATE rooms
 		SET status = 'closed'
-		WHERE creator_token_hash = ? AND status = 'active';
+		WHERE creator_token_hash = ? AND status IN ('active', 'closing');
 	`
 
 	res, err := s.db.ExecContext(ctx, query, creatorHash)
@@ -419,6 +547,35 @@ func (s *Store) Close(ctx context.Context, creatorToken string) error {
 	if rows == 0 {
 		var exists int
 		err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM rooms WHERE creator_token_hash = ?", creatorHash).Scan(&exists)
+		if err == nil && exists > 0 {
+			return ErrRoomClosed
+		}
+		return ErrRoomNotFound
+	}
+
+	return nil
+}
+
+// CloseByRoomID closes an active or closing room by its unique room ID regardless of token type.
+func (s *Store) CloseByRoomID(ctx context.Context, roomID string) error {
+	query := `
+		UPDATE rooms
+		SET status = 'closed'
+		WHERE id = ? AND status IN ('active', 'closing');
+	`
+
+	res, err := s.db.ExecContext(ctx, query, roomID)
+	if err != nil {
+		return fmt.Errorf("close room by id: %w", err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("check rows affected: %w", err)
+	}
+	if rows == 0 {
+		var exists int
+		err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM rooms WHERE id = ?", roomID).Scan(&exists)
 		if err == nil && exists > 0 {
 			return ErrRoomClosed
 		}

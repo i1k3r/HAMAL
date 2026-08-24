@@ -998,6 +998,26 @@ body {
   border-radius: var(--radius-sm);
 }
 
+.btn-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.btn-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: 600;
+  background-color: var(--accent-success-glow) !important;
+  color: var(--accent-success) !important;
+  border-color: var(--accent-success-border) !important;
+  cursor: default !important;
+  text-decoration: none;
+}
+
 .btn-danger-restrained {
   background-color: transparent;
   color: var(--accent-danger);
@@ -1010,6 +1030,180 @@ body {
 .btn-danger-restrained:hover {
   background-color: var(--accent-danger-glow);
   border-color: var(--accent-danger);
+}
+
+/* --------------------------------------------------------------------------
+   Participant Room Status Card (Dieter Rams / Braun Functional Layout)
+   -------------------------------------------------------------------------- */
+.room-status-card {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.room-status-top {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.room-status-desc {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.room-status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  align-items: center;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.875rem 1.25rem;
+  gap: 1rem;
+}
+
+.room-metric-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.room-metric-box.metric-right {
+  align-items: flex-start;
+}
+
+.room-metric-divider {
+  width: 1px;
+  height: 38px;
+  background: var(--border-color);
+  justify-self: center;
+}
+
+.metric-caption {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.countdown-timer {
+  font-family: var(--font-mono);
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.countdown-timer.timer-warning {
+  color: var(--accent-warning);
+  text-shadow: 0 0 12px var(--accent-warning-glow);
+}
+
+.metric-peer-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+.metric-peer-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--accent-success);
+  flex-shrink: 0;
+}
+
+.metric-peer-val {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+@media (max-width: 300px) {
+  .room-status-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .room-metric-divider {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Room Closing Card (Server Authoritative 10s Countdown)
+   -------------------------------------------------------------------------- */
+.room-closing-card {
+  padding: 1.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.875rem;
+  text-align: center;
+  border: 1px solid var(--accent-danger-border);
+  background: var(--bg-surface-elevated);
+}
+
+.closing-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.badge-closing {
+  background: var(--accent-danger-glow);
+  color: var(--accent-danger);
+  border: 1px solid var(--accent-danger-border);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.dot-closing {
+  background-color: var(--accent-danger);
+  box-shadow: 0 0 8px var(--accent-danger);
+}
+
+.closing-desc {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.closing-countdown-box {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.closing-timer-number {
+  font-family: var(--font-mono);
+  font-size: 3.25rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-danger);
+}
+
+.closing-timer-label {
+  font-size: 1.0625rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
 }
 
 .btn-danger {
@@ -1029,18 +1223,22 @@ body {
 .content-column {
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
+  gap: 1.25rem;
 }
 
 /* Dropzone (Courier File Ingestion) */
+.dropzone-card {
+  padding: 1.25rem;
+}
+
 .dropzone {
-  border: 2px dashed var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 2.25rem 1.5rem;
+  border: 1.5px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.5rem 1.25rem;
   text-align: center;
   background-color: var(--bg-surface);
   cursor: pointer;
-  transition: all var(--transition-smooth);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1056,31 +1254,32 @@ body {
 .dropzone.dragover {
   border-color: var(--accent-amber);
   background-color: var(--accent-amber-glow);
-  transform: scale(1.005);
 }
 
 .dropzone-icon {
-  width: 48px;
-  height: 48px;
-  margin-bottom: 0.75rem;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 0.5rem;
   color: var(--accent-amber);
   transition: transform var(--transition-fast);
 }
 
-.dropzone:hover .dropzone-icon, .dropzone.dragover .dropzone-icon {
+.dropzone:hover .dropzone-icon,
+.dropzone.dragover .dropzone-icon {
   transform: translateY(-2px);
 }
 
 .dropzone-title {
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 0.25rem;
+  margin: 0 0 0.1875rem 0;
 }
 
 .dropzone-hint {
   font-size: 0.8125rem;
   color: var(--text-muted);
+  margin: 0;
 }
 
 .browse-link {
@@ -1092,8 +1291,8 @@ body {
 
 /* Upload Progress Container */
 .upload-progress-container {
-  margin-top: 1rem;
-  padding: 1rem 1.25rem;
+  margin-top: 0.875rem;
+  padding: 0.875rem 1.125rem;
   background: var(--bg-surface-elevated);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
@@ -1140,11 +1339,15 @@ body {
 /* --------------------------------------------------------------------------
    Files List Section
    -------------------------------------------------------------------------- */
+.files-card {
+  padding: 1.25rem 1.5rem;
+}
+
 .files-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.875rem;
   padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--border-color);
 }
@@ -1152,43 +1355,51 @@ body {
 .files-title-group {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.5rem;
 }
 
 .files-title {
-  font-size: 1rem;
+  font-size: 0.875rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--text-primary);
+  margin: 0;
 }
 
 .count-pill {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   font-weight: 700;
-  padding: 0.15rem 0.5rem;
+  padding: 0.125rem 0.5rem;
   background: var(--bg-surface-elevated);
   color: var(--accent-amber);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-full);
 }
 
+.files-sort-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
 .file-list {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: 0.5rem;
 }
 
 .file-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.875rem 1.125rem;
+  padding: 0.75rem 1rem;
   background: var(--bg-surface-elevated);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
-  gap: 1rem;
+  gap: 0.875rem;
 }
 
 .file-item:hover {
@@ -1199,9 +1410,10 @@ body {
 .file-item-main {
   display: flex;
   align-items: center;
-  gap: 0.875rem;
+  gap: 0.75rem;
   overflow: hidden;
   flex: 1;
+  min-width: 0;
 }
 
 .file-type-icon {
@@ -1215,27 +1427,31 @@ body {
   align-items: center;
   justify-content: center;
   color: var(--accent-amber);
+  flex-shrink: 0;
 }
 
 .file-type-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 
 .file-info {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex: 1;
+  min-width: 0;
   gap: 0.125rem;
 }
 
 .file-name {
   font-weight: 600;
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .file-meta {
@@ -1245,6 +1461,9 @@ body {
   display: flex;
   align-items: center;
   gap: 0.375rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .meta-separator {
@@ -1258,10 +1477,64 @@ body {
   flex-shrink: 0;
 }
 
+/* --------------------------------------------------------------------------
+   Participant Bottom Action Section (Full-Width Restrained Destructive Action)
+   -------------------------------------------------------------------------- */
+.participant-bottom-actions {
+  width: 100%;
+  margin-top: 1.75rem !important;
+  margin-bottom: 0 !important;
+  padding-bottom: max(2.5rem, env(safe-area-inset-bottom, 2.5rem));
+  display: block !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box;
+  clear: both;
+}
+
+.btn-close-room-bottom {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--accent-danger);
+  border: 1px solid var(--accent-danger-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.btn-close-room-bottom:hover,
+.btn-close-room-bottom:focus {
+  background: var(--accent-danger-glow);
+  border-color: var(--accent-danger);
+  outline: none;
+}
+
+.btn-close-room-bottom:active {
+  transform: scale(0.99);
+}
+
+.close-lock-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
 /* Empty State */
 .empty-state {
   text-align: center;
-  padding: 3rem 1.5rem;
+  padding: 2.5rem 1.25rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1389,6 +1662,10 @@ body {
   box-shadow: var(--shadow-elevated);
 }
 
+#confirm-modal-title {
+  text-align: center;
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -1427,4 +1704,69 @@ footer {
   margin-top: 0.375rem;
   font-size: 0.6875rem;
   opacity: 0.8;
+}
+
+/* --------------------------------------------------------------------------
+   Executable File Warning Badge & Tooltip
+   -------------------------------------------------------------------------- */
+.badge-exec-warning {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-amber);
+  background: var(--accent-amber-glow);
+  border: 1px solid var(--accent-amber-border);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.45rem;
+  cursor: help;
+  user-select: none;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.badge-exec-warning:hover,
+.badge-exec-warning:focus {
+  background: rgba(217, 119, 6, 0.25);
+  border-color: var(--accent-amber);
+  outline: none;
+}
+
+.badge-exec-warning .warning-tooltip {
+  visibility: hidden;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: var(--bg-surface-elevated, #1e293b);
+  color: var(--text-primary, #f8fafc);
+  font-size: 0.775rem;
+  font-family: var(--font-sans);
+  line-height: 1.4;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-elevated);
+  white-space: normal;
+  width: max-content;
+  max-width: 220px;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  text-align: left;
+}
+
+[dir="rtl"] .badge-exec-warning .warning-tooltip {
+  right: auto;
+  left: 0;
+  text-align: right;
+}
+
+.badge-exec-warning:hover .warning-tooltip,
+.badge-exec-warning:focus .warning-tooltip {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
 }

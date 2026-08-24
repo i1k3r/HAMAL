@@ -189,6 +189,82 @@ func TestStoreRoomEarlyClose(t *testing.T) {
 	}
 }
 
+func TestStoreRoomClosingLifecycle(t *testing.T) {
+	store, _ := setupTestStore(t)
+	ctx := context.Background()
+
+	created, err := store.Create(ctx, time.Hour, 10<<30, 2<<30, 100, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Initial active state
+	rm, role, err := store.GetByToken(ctx, created.ParticipantToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if role != RoleParticipant || rm.Status != "active" || rm.IsClosing() {
+		t.Fatalf("expected active room, got %s", rm.Status)
+	}
+
+	// 2. Start closing with 10-second duration
+	closingRoom, err := store.StartClosing(ctx, created.ID, 10*time.Second)
+	if err != nil {
+		t.Fatalf("start closing failed: %v", err)
+	}
+	if closingRoom.Status != "closing" || !closingRoom.IsClosing() {
+		t.Fatalf("expected status closing, got %s", closingRoom.Status)
+	}
+	if closingRoom.CloseDeadline == nil {
+		t.Fatal("expected non-nil CloseDeadline")
+	}
+	remSec := closingRoom.ClosingRemainingSeconds()
+	if remSec <= 0 || remSec > 10 {
+		t.Fatalf("expected remaining seconds between 1 and 10, got %d", remSec)
+	}
+
+	// 3. Repeated StartClosing call does NOT extend or reset deadline
+	initialDeadline := *closingRoom.CloseDeadline
+	reClosingRoom, err := store.StartClosing(ctx, created.ID, 10*time.Second)
+	if err != nil {
+		t.Fatalf("repeat start closing failed: %v", err)
+	}
+	if reClosingRoom.Status != "closing" {
+		t.Fatalf("expected status closing on repeat, got %s", reClosingRoom.Status)
+	}
+	if reClosingRoom.CloseDeadline.Unix() != initialDeadline.Unix() {
+		t.Fatalf("expected deadline unix %v unchanged, got %v", initialDeadline.Unix(), reClosingRoom.CloseDeadline.Unix())
+	}
+
+	// 4. Querying during closing returns status "closing"
+	closingQuery, _, err := store.GetByToken(ctx, created.ParticipantToken)
+	if err != nil {
+		t.Fatalf("expected no error during closing query, got %v", err)
+	}
+	if closingQuery.Status != "closing" {
+		t.Fatalf("expected status closing from GetByToken, got %s", closingQuery.Status)
+	}
+
+	// 5. Update close_deadline to past to simulate deadline expiration
+	pastDeadline := time.Now().UTC().Add(-2 * time.Second).Format(time.RFC3339)
+	_, err = store.db.Exec("UPDATE rooms SET close_deadline = ? WHERE id = ?", pastDeadline, created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 6. GetByToken detects past deadline and finalizes to closed
+	_, _, err = store.GetByToken(ctx, created.ParticipantToken)
+	if !errors.Is(err, ErrRoomClosed) {
+		t.Fatalf("expected ErrRoomClosed after deadline, got %v", err)
+	}
+
+	// 7. StartClosing on closed room returns ErrRoomClosed
+	_, err = store.StartClosing(ctx, created.ID, 10*time.Second)
+	if !errors.Is(err, ErrRoomClosed) {
+		t.Fatalf("expected ErrRoomClosed on StartClosing for already closed room, got %v", err)
+	}
+}
+
 func TestValidatePIN(t *testing.T) {
 	valid := []string{"1234", "0000", "98765432", "abcd", "A1b2", " 123456 "}
 	for _, p := range valid {

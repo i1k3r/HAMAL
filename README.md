@@ -1,10 +1,11 @@
 <div align="center">
 
-<img src="brand/hamal-logo-dark.svg" alt="HAMAL Logo" width="320" />
+<img src="brand/hamal-logo-light.svg#gh-light-mode-only" alt="HAMAL Logo Light" width="320" />
+<img src="brand/hamal-logo-dark.svg#gh-dark-mode-only" alt="HAMAL Logo Dark" width="320" />
 
 # HAMAL
 
-**Point-to-point local file transfer. The carrier for your digital cargo.**
+**Fast, private, temporary file transfer.**
 
 [![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go)](https://golang.org)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker)](Dockerfile)
@@ -138,6 +139,15 @@ HAMAL is configured via environment variables:
 | `LAN_DROP_LOG_FORMAT` | `json` | Log format (`json` or `text`) |
 | `LAN_DROP_LOG_LEVEL` | `info` | Log verbosity (`debug`, `info`, `warn`, `error`) |
 | `LAN_DROP_SECURE_COOKIES` | `auto` | Cookie security (`auto`, `true`, `false`) |
+
+---
+
+## Official Desktop Applications
+
+HAMAL is available as a native, zero-cloud desktop application for multiple platforms:
+
+- **[HAMAL for Windows](https://github.com/i1k3r/HAMAL-Windows)**: Native Windows desktop client packaged with MSIX and Microsoft Store distribution support.
+- **[HAMAL for Linux](https://github.com/i1k3r/HAMAL-Linux)**: Native Linux desktop application and Snap package with WebKit2GTK engine and 20-language support.
 
 ---
 

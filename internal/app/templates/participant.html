@@ -5,7 +5,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#141312" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#F8F7F4" media="(prefers-color-scheme: light)">
   <title>HAMAL · Participant Connection</title>
+  <link rel="icon" type="image/svg+xml" href="/static/brand/hamal-app-icon.svg">
+  <link rel="alternate icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/static/brand/hamal-app-icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -19,9 +24,8 @@
     })();
   </script>
   <script defer src="/static/site.js"></script>
-</head>
-<body data-page="participant" data-token="{{.ParticipantToken}}" data-expires="{{.ExpiresAtRFC3339}}" data-pin-required="{{.PinRequired}}" data-pin-authenticated="{{.PinAuthenticated}}" data-is-locked="{{.IsLocked}}" data-retry-after="{{.RetryAfterSeconds}}">
-  <div class="app-container" style="max-width: 760px;">
+</head><body data-page="participant" data-token="{{.ParticipantToken}}" data-expires="{{.ExpiresAtRFC3339}}" data-status="{{.Status}}" data-close-deadline="{{.CloseDeadline}}" data-closing-seconds="{{.ClosingRemainingSeconds}}" data-pin-required="{{.PinRequired}}" data-pin-authenticated="{{.PinAuthenticated}}" data-is-locked="{{.IsLocked}}" data-retry-after="{{.RetryAfterSeconds}}">
+  <div class="app-container participant-container" style="max-width: 680px;">
     <!-- Header Navigation -->
     <header class="header-nav">
       <a href="/" class="brand-wrapper" title="HAMAL">
@@ -51,11 +55,24 @@
     </header>
 
     <main class="content-column">
-      <!-- PIN Entry Card (Shown if PIN is required and not yet authenticated) -->
-      <section id="room-pin-card" class="card" style="{{if not (and .PinRequired (not .PinAuthenticated))}}display: none;{{end}}">
-        <div class="card-header" style="text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
-          <div style="width: 56px; height: 56px; border-radius: var(--radius-full); background: var(--accent-amber-glow); border: 1px solid var(--accent-amber-border); display: flex; align-items: center; justify-content: center; margin-bottom: 0.875rem; color: var(--accent-amber);">
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Inactive / Closed State -->
+      <section id="card-inactive" class="card empty-state-card" style="{{if not .Inactive}}display: none;{{end}}">
+        <div class="empty-icon-box">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>
+        <h2 id="inactive-title" class="card-title">Room Inactive</h2>
+        <p id="inactive-desc" class="card-subtitle">This transfer room has expired or was closed by the host. Any temporary files have been permanently deleted.</p>
+      </section>
+
+      <!-- PIN Authentication Barrier Card -->
+      <section id="pin-barrier-card" class="card" style="{{if or (not .PinRequired) .PinAuthenticated .Inactive}}display: none;{{end}}">
+        <div class="card-header-group">
+          <div class="badge-icon-box" style="width: 44px; height: 44px; border-radius: var(--radius-md); background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: center; margin-bottom: 0.75rem; color: var(--accent-primary);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
             </svg>
@@ -81,32 +98,52 @@
 
       <!-- Active Participant Room Section -->
       <section id="room-active-card" class="content-column" style="{{if and .PinRequired (not .PinAuthenticated)}}display: none;{{end}}">
-        <!-- Room Status Bar -->
-        <div class="card" style="padding: 1.25rem 1.5rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-            <div>
-              <div class="badge-row" style="margin-bottom: 0.375rem;">
-                <span id="status-badge" class="badge badge-active">
-                  <span class="badge-dot"></span>ROOM ACTIVE
-                </span>
-                {{if .PinRequired}}<span class="badge badge-pin">PIN Verified</span>{{end}}
-              </div>
-              <p class="card-subtitle" style="margin: 0;">Connected to peer transfer room</p>
-            </div>
+        <!-- Room Closing Card (Server Authoritative 10s Countdown) -->
+        <div id="room-closing-card" class="card room-closing-card" style="{{if ne .Status "closing"}}display: none;{{end}}">
+          <div class="closing-badge-row">
+            <span class="badge badge-closing">
+              <span class="badge-dot dot-closing"></span><span id="closing-badge-text">ROOM CLOSING</span>
+            </span>
+          </div>
+          <p id="closing-card-desc" class="closing-desc">This transfer room will close automatically in</p>
+          <div class="closing-countdown-box">
+            <span id="closing-countdown" class="closing-timer-number">{{if .ClosingRemainingSeconds}}{{.ClosingRemainingSeconds}}{{else}}10{{end}}</span>
+            <span id="closing-seconds-label" class="closing-timer-label">seconds</span>
+          </div>
+        </div>
 
-            <div class="room-status-box" style="padding: 0.5rem 1rem; border-radius: var(--radius-md);">
-              <div class="status-label-group" style="align-items: flex-end;">
-                <span class="status-caption">Expires in</span>
-                <span id="countdown" class="countdown-timer" style="font-size: 1.375rem;">Calculating…</span>
+        <!-- Room Status Card -->
+        <div class="card room-status-card" style="{{if eq .Status "closing"}}display: none;{{end}}">
+          <div class="room-status-top">
+            <div class="badge-row">
+              <span id="status-badge" class="badge badge-active">
+                <span class="badge-dot"></span>ROOM ACTIVE
+              </span>
+              {{if .PinRequired}}<span class="badge badge-pin">PIN Verified</span>{{end}}
+            </div>
+            <p class="card-subtitle room-status-desc">Connected to peer transfer room</p>
+          </div>
+
+          <div class="room-status-grid">
+            <div class="room-metric-box metric-left">
+              <span class="metric-caption">Expires in</span>
+              <span id="countdown" class="countdown-timer">Calculating…</span>
+            </div>
+            <div class="room-metric-divider"></div>
+            <div class="room-metric-box metric-right">
+              <span class="metric-caption">Connection</span>
+              <div class="metric-peer-group">
+                <span class="badge-dot" style="background-color: var(--accent-success); width: 8px; height: 8px; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px var(--accent-success); flex-shrink: 0;"></span>
+                <span class="metric-peer-val">2 Active</span>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Upload Dropzone Card -->
-        <div class="card">
+        <div class="card dropzone-card">
           <div id="dropzone" class="dropzone">
-            <svg class="dropzone-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <svg id="dropzone-icon" class="dropzone-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="17 8 12 3 7 8"></polyline>
               <line x1="12" y1="3" x2="12" y2="15"></line>
@@ -129,12 +166,13 @@
         </div>
 
         <!-- Room Files Card -->
-        <div class="card">
+        <div class="card files-card">
           <div class="files-header">
             <div class="files-title-group">
               <h3 class="files-title">Files in Room</h3>
               <span id="file-count" class="count-pill">{{len .Files}}</span>
             </div>
+            <span class="files-sort-label font-mono">Newest first</span>
           </div>
 
           <div id="file-list" class="file-list">
@@ -178,6 +216,17 @@
             {{end}}
           </div>
         </div>
+
+        <!-- Participant Bottom Action Section -->
+        <div class="participant-bottom-actions">
+          <button type="button" id="participant-close-btn" class="btn btn-close-room-bottom">
+            <svg class="close-lock-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <span id="participant-close-text">Close Room Now</span>
+          </button>
+        </div>
       </section>
 
       <!-- Inactive Room State -->
@@ -202,6 +251,25 @@
       <p>© {{.Year}} HAMAL · Courier File Transfer · Private & Temporary</p>
       <p class="footer-signature">© 2026 i1k3r</p>
     </footer>
+  </div>
+
+  <!-- Participant Close Room Confirmation Modal -->
+  <div id="close-confirm-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card" style="max-width: 420px; text-align: center;">
+      <div style="width: 52px; height: 52px; border-radius: var(--radius-full); background: var(--accent-danger-glow); border: 1px solid var(--accent-danger-border); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; color: var(--accent-danger);">
+        <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="15" y1="9" x2="9" y2="15"></line>
+          <line x1="9" y1="9" x2="15" y2="15"></line>
+        </svg>
+      </div>
+      <h3 id="confirm-modal-title" class="card-title" style="margin: 0 auto 0.5rem auto; font-size: 1.15rem; text-align: center; width: 100%; display: block;">Close this transfer room?</h3>
+      <p id="confirm-modal-desc" class="card-subtitle" style="margin-bottom: 1.5rem; font-size: 0.875rem; line-height: 1.45;">All temporary files will be purged and participants cannot rejoin.</p>
+      <div style="display: flex; gap: 0.75rem; justify-content: center;">
+        <button type="button" id="cancel-close-btn" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+        <button type="button" id="confirm-close-btn" class="btn btn-danger" style="flex: 1;">Close Room</button>
+      </div>
+    </div>
   </div>
 </body>
 </html>

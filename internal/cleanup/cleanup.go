@@ -105,6 +105,9 @@ func (w *Worker) RunOnce(ctx context.Context) (Stats, error) {
 	nowStr := now.Format(time.RFC3339)
 	closedCutoffStr := now.Add(-w.opts.ClosedRoomRetention).Format(time.RFC3339)
 
+	// Step 0: Transition closing rooms past deadline to closed
+	_, _ = w.db.ExecContext(ctx, `UPDATE rooms SET status = 'closed' WHERE status = 'closing' AND close_deadline <= ?;`, nowStr)
+
 	// Step 1: Expired & eligible closed room cleanup
 	roomQuery := `
 		SELECT id

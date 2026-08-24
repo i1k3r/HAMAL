@@ -1,16 +1,19 @@
 # Security Policy
 
-## Security principles
+## Security Principles
 
-LAN-Drop is designed as self-hosted software. Operators control their storage, deployment environment, reverse proxy, and any Internet exposure. The project will not operate central storage, accounts, relays, analytics, or advertising.
+HAMAL is designed as private, self-hosted file transfer software. Operators control their storage, deployment environment, reverse proxy, and any network exposure. The project does not operate central storage, accounts, relays, analytics, telemetry, or advertising.
 
-The current foundation implements a few defensive building blocks: non-root containers, a single explicit persistent storage location, SQLite WAL initialization, request IDs, structured logging, health checks, and protections against logging future sensitive room URL paths.
+Core security features include:
+- Ephemeral, time-limited room lifecycles with automatic purge upon expiry.
+- Ephemeral cryptographic tokens separating creator controls from participant access.
+- Optional 4–8 character PIN protection with exponential rate limiting and lockout.
+- Pure local network streaming without cloud relay or persistent staging retention.
+- Zero credential logging: tokens, PINs, and sensitive authorization headers are never logged.
 
-The application is **not yet production secure** and is **not ready for general use**. Temporary rooms, file transfer, access controls, PIN handling, rate limiting, cleanup, and Global Share have not been implemented in this phase.
+## Secret Handling
 
-## Secret handling
-
-`LAN_DROP_SERVER_SECRET` is never logged or stored in SQLite. If it is omitted, LAN-Drop generates and stores a persistent secret at `/data/secrets/server-secret`. Operators must protect the `/data` mount and back it up according to their own operational requirements.
+`LAN_DROP_SERVER_SECRET` (or generated fallback) is never logged or stored in SQLite. If omitted, HAMAL generates and stores a persistent server secret at `/data/secrets/server-secret`. Operators must protect the `/data` mount according to their operational requirements.
 
 ## Reporting a vulnerability
 

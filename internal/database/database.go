@@ -186,6 +186,29 @@ func Migrate(db *sql.DB) error {
 			return fmt.Errorf("commit migration 5: %w", err)
 		}
 	}
+
+	var v6Applied int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version = 6;`).Scan(&v6Applied); err != nil {
+		return fmt.Errorf("check migration 6: %w", err)
+	}
+	if v6Applied == 0 {
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("begin migration 6: %w", err)
+		}
+		defer tx.Rollback()
+		schema := `
+			ALTER TABLE rooms ADD COLUMN close_deadline TEXT NULL;
+			CREATE INDEX IF NOT EXISTS idx_rooms_close_deadline ON rooms (close_deadline);
+			INSERT INTO schema_migrations (version) VALUES (6);
+		`
+		if _, err := tx.Exec(schema); err != nil {
+			return fmt.Errorf("execute migration 6: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit migration 6: %w", err)
+		}
+	}
 	return nil
 }
 

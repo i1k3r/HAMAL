@@ -379,6 +379,16 @@ func (a *App) routes() (http.Handler, error) {
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(static))))
+	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/x-icon")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		data, err := assets.ReadFile("static/favicon.ico")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(data)
+	})
 
 	// Health & Readiness
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -513,17 +523,25 @@ func (a *App) routes() (http.Handler, error) {
 			filesList = []file.File{}
 		}
 
+		var closeDeadlineStr string
+		if rm.CloseDeadline != nil {
+			closeDeadlineStr = rm.CloseDeadline.Format(time.RFC3339)
+		}
+
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = tmpl.ExecuteTemplate(w, "participant.html", map[string]any{
-			"Year":              time.Now().Year(),
-			"ParticipantToken":  token,
-			"ExpiresAtRFC3339":  rm.ExpiresAt.Format(time.RFC3339),
-			"Inactive":          false,
-			"PinRequired":       rm.PinRequired,
-			"PinAuthenticated":  isAuth,
-			"IsLocked":          rm.IsLocked(),
-			"RetryAfterSeconds": rm.LockoutRemainingSeconds(),
-			"Files":             filesList,
+			"Year":                    time.Now().Year(),
+			"ParticipantToken":        token,
+			"ExpiresAtRFC3339":        rm.ExpiresAt.Format(time.RFC3339),
+			"Status":                  rm.Status,
+			"CloseDeadline":           closeDeadlineStr,
+			"ClosingRemainingSeconds": rm.ClosingRemainingSeconds(),
+			"Inactive":                false,
+			"PinRequired":             rm.PinRequired,
+			"PinAuthenticated":        isAuth,
+			"IsLocked":                rm.IsLocked(),
+			"RetryAfterSeconds":       rm.LockoutRemainingSeconds(),
+			"Files":                   filesList,
 		})
 	})
 
@@ -762,16 +780,23 @@ func (a *App) routes() (http.Handler, error) {
 
 		isAuth := (role == room.RoleCreator) || a.isParticipantAuthenticated(r.Context(), rm, r)
 
+		var closeDeadlineStr string
+		if rm.CloseDeadline != nil {
+			closeDeadlineStr = rm.CloseDeadline.Format(time.RFC3339)
+		}
+
 		resp := map[string]any{
-			"room_id":             rm.ID,
-			"status":              rm.Status,
-			"is_creator":          (role == room.RoleCreator),
-			"expires_at":          rm.ExpiresAt.Format(time.RFC3339),
-			"remaining_seconds":   remainingSeconds,
-			"pin_required":        rm.PinRequired,
-			"pin_authenticated":   isAuth,
-			"is_locked":           rm.IsLocked(),
-			"retry_after_seconds": rm.LockoutRemainingSeconds(),
+			"room_id":                   rm.ID,
+			"status":                    rm.Status,
+			"is_creator":                (role == room.RoleCreator),
+			"expires_at":                rm.ExpiresAt.Format(time.RFC3339),
+			"close_deadline":            closeDeadlineStr,
+			"closing_remaining_seconds": rm.ClosingRemainingSeconds(),
+			"remaining_seconds":         remainingSeconds,
+			"pin_required":              rm.PinRequired,
+			"pin_authenticated":         isAuth,
+			"is_locked":                 rm.IsLocked(),
+			"retry_after_seconds":       rm.LockoutRemainingSeconds(),
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -780,23 +805,62 @@ func (a *App) routes() (http.Handler, error) {
 
 	mux.HandleFunc("POST /api/v1/rooms/{token}/close", func(w http.ResponseWriter, r *http.Request) {
 		token := r.PathValue("token")
-		err := a.rooms.Close(r.Context(), token)
+		rm, role, err := a.rooms.GetByToken(r.Context(), token)
 		if err != nil {
 			if errors.Is(err, room.ErrRoomNotFound) {
 				writeJSONError(w, "room not found or unauthorized", http.StatusNotFound)
 				return
 			}
+			if errors.Is(err, room.ErrRoomExpired) || errors.Is(err, room.ErrRoomClosed) {
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "closed", "remaining_seconds": 0})
+				return
+			}
+			writeJSONError(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if role == room.RoleCreator {
+			err = a.rooms.CloseByRoomID(r.Context(), rm.ID)
+			if err != nil && !errors.Is(err, room.ErrRoomClosed) {
+				writeJSONError(w, "failed to close room", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "closed", "remaining_seconds": 0})
+			return
+		}
+
+		if role == room.RoleParticipant && rm.PinRequired {
+			if !a.isParticipantAuthenticated(r.Context(), rm, r) {
+				writeJSONError(w, "PIN authentication required", http.StatusUnauthorized)
+				return
+			}
+		}
+
+		closingRoom, err := a.rooms.StartClosing(r.Context(), rm.ID, 10*time.Second)
+		if err != nil {
 			if errors.Is(err, room.ErrRoomClosed) {
 				w.Header().Set("Content-Type", "application/json")
-				_ = json.NewEncoder(w).Encode(map[string]any{"status": "closed"})
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "closed", "remaining_seconds": 0})
 				return
 			}
 			writeJSONError(w, "failed to close room", http.StatusInternalServerError)
 			return
 		}
 
+		var closeDeadlineStr string
+		if closingRoom.CloseDeadline != nil {
+			closeDeadlineStr = closingRoom.CloseDeadline.Format(time.RFC3339)
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"status": "closed"})
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status":                    closingRoom.Status,
+			"close_deadline":            closeDeadlineStr,
+			"closing_remaining_seconds": closingRoom.ClosingRemainingSeconds(),
+			"remaining_seconds":         closingRoom.ClosingRemainingSeconds(),
+		})
 	})
 
 	mux.HandleFunc("GET /api/v1/rooms/{token}/qr.svg", func(w http.ResponseWriter, r *http.Request) {
@@ -857,6 +921,11 @@ func (a *App) routes() (http.Handler, error) {
 				return
 			}
 			writeJSONError(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if rm.Status == "closing" {
+			writeJSONError(w, "room is closing, uploads not allowed", http.StatusConflict)
 			return
 		}
 
@@ -993,13 +1062,21 @@ func (a *App) routes() (http.Handler, error) {
 			filesList = []file.File{}
 		}
 
+		var closeDeadlineStr string
+		if rm.CloseDeadline != nil {
+			closeDeadlineStr = rm.CloseDeadline.Format(time.RFC3339)
+		}
+
 		resp := map[string]any{
-			"room_id":          rm.ID,
-			"files":            filesList,
-			"total_size_bytes": usedBytes,
-			"file_count":       count,
-			"max_room_size":    rm.MaxRoomSize,
-			"max_files":        rm.MaxFiles,
+			"room_id":                   rm.ID,
+			"status":                    rm.Status,
+			"close_deadline":            closeDeadlineStr,
+			"closing_remaining_seconds": rm.ClosingRemainingSeconds(),
+			"files":                     filesList,
+			"total_size_bytes":          usedBytes,
+			"file_count":                count,
+			"max_room_size":             rm.MaxRoomSize,
+			"max_files":                 rm.MaxFiles,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -1030,6 +1107,11 @@ func (a *App) routes() (http.Handler, error) {
 				return
 			}
 			writeJSONError(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if rm.Status == "closing" {
+			writeJSONError(w, "room is closing, downloads not allowed", http.StatusGone)
 			return
 		}
 
