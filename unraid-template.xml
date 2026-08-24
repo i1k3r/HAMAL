@@ -7,7 +7,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/i1k3r/HAMAL/issues</Support>
   <Project>https://github.com/i1k3r/HAMAL</Project>
-  <Overview>Private, self-hosted LAN file transfer with temporary rooms and QR-based device joining.</Overview>
+  <Overview>HAMAL is a private, self-hosted LAN file transfer service for sharing files directly across your local network. Create temporary transfer rooms, connect devices with QR codes, and transfer files without cloud storage. Optional PIN protection and automatic room expiration keep transfers temporary and private.</Overview>
   <Category>Tools: Productivity: Network:Web</Category>
   <Icon>https://raw.githubusercontent.com/i1k3r/HAMAL/main/assets/hamal-icon.png</Icon>
   <WebUI>http://[IP]:[PORT:7700]</WebUI>
