@@ -1,21 +1,224 @@
-MIT License
+HAMAL SOURCE-AVAILABLE ORGANIZATIONAL USE LICENSE
+Version 1.0
 
-Copyright (c) 2026 i1k3r
+Copyright (c) 2026 i1K3R Labs
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. DEFINITIONS
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+"Software" means HAMAL, including its source code, object code,
+documentation, configuration, assets, and substantial portions thereof.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+"Derivative Work" means a modified version of the Software or a work
+substantially based upon the Software.
+
+"Organization" means a company, business, government entity,
+educational institution, non-profit organization, or other legal entity.
+
+"Internal Organizational Use" means use of the Software by an Organization
+for its own internal operations, employees, contractors, infrastructure,
+systems, and business processes, where the Software is not offered as a
+product or service to third parties.
+
+"Commercial Distribution" means selling, licensing, sublicensing,
+renting, leasing, reselling, or otherwise providing the Software or a
+Derivative Work to third parties for monetary compensation or commercial
+advantage.
+
+"Commercial Service" means providing the functionality of the Software
+to third parties as a paid or revenue-generating service, including
+SaaS, hosted services, managed services, APIs, file-transfer services,
+or substantially similar offerings.
+
+2. GRANT OF RIGHTS
+
+Subject to the terms of this License, the Copyright Holder grants you a
+worldwide, non-exclusive, royalty-free license to:
+
+a. use the Software;
+
+b. study and inspect the source code;
+
+c. modify the Software;
+
+d. create Derivative Works;
+
+e. create private forks;
+
+f. reproduce and internally distribute the Software and Derivative Works;
+
+g. deploy the Software and Derivative Works within your own
+   infrastructure.
+
+These rights are granted for personal use, educational use, research,
+testing, evaluation, and Internal Organizational Use.
+
+3. INTERNAL ORGANIZATIONAL USE
+
+Organizations are expressly permitted to use HAMAL for their own internal
+business and operational purposes, including commercial business
+operations.
+
+An Organization may:
+
+a. install HAMAL on its own servers, workstations, or infrastructure;
+
+b. use HAMAL with its employees, contractors, and authorized personnel;
+
+c. modify HAMAL to meet its own operational or technical requirements;
+
+d. create private internal forks of HAMAL;
+
+e. modify the user interface, branding, configuration, integrations,
+   workflows, and functionality for internal use;
+
+f. deploy modified versions throughout its own organization;
+
+g. use HAMAL as part of its normal internal commercial operations.
+
+Internal Organizational Use is permitted regardless of whether the
+Organization itself operates for profit.
+
+4. PRIVATE MODIFICATIONS
+
+An Organization may modify HAMAL for Internal Organizational Use without
+being required by this License to publish, disclose, or contribute those
+modifications to the Copyright Holder or to the public.
+
+Private modifications remain permitted provided that the modified
+Software is not Commercially Distributed or offered as a Commercial
+Service to third parties.
+
+5. PROHIBITED COMMERCIAL USE
+
+Without prior written permission from the Copyright Holder, you may NOT:
+
+a. sell HAMAL or a Derivative Work as software;
+
+b. license or sublicense HAMAL or a Derivative Work to third parties;
+
+c. offer HAMAL or a Derivative Work as a commercial software product;
+
+d. rebrand, rename, substantially modify, or otherwise create a
+   substantially equivalent commercial product based on HAMAL and
+   distribute that product to third parties;
+
+e. incorporate substantial portions of HAMAL into a commercial software
+   product that is distributed to third parties;
+
+f. commercially distribute HAMAL or a Derivative Work;
+
+g. offer HAMAL or a Derivative Work as a paid SaaS, hosted, managed,
+   cloud, API, file-transfer, synchronization, storage, or similar
+   service to third parties;
+
+h. charge customers specifically for access to HAMAL or functionality
+   substantially derived from HAMAL;
+
+i. use HAMAL as the underlying software for a commercial service where
+   access to the Software or its substantially derived functionality is
+   itself part of the commercial offering.
+
+6. PROFESSIONAL SERVICES
+
+This License does not prohibit ordinary professional services performed
+around HAMAL.
+
+For example, an Organization or service provider may provide:
+
+- installation assistance;
+- configuration assistance;
+- system administration;
+- technical support;
+- consulting;
+- training;
+- infrastructure management.
+
+Such services are permitted provided that the provider is not selling,
+licensing, or commercially distributing HAMAL itself or a Derivative Work
+as a software product or service.
+
+7. THIRD-PARTY USE
+
+Internal Organizational Use does not include making HAMAL available to
+customers, clients, external organizations, or members of the public as
+a product or service.
+
+An Organization may use HAMAL internally even when that Organization
+generates revenue through its normal business activities.
+
+However, providing HAMAL or a Derivative Work to third parties as part
+of a paid or revenue-generating software offering requires separate
+written permission from the Copyright Holder.
+
+8. REDISTRIBUTION
+
+Non-commercial redistribution is permitted provided that:
+
+a. this License is included;
+
+b. copyright and attribution notices are preserved;
+
+c. the recipient receives the same rights and restrictions;
+
+d. the redistribution does not constitute Commercial Distribution.
+
+Commercial redistribution requires a separate written license from the
+Copyright Holder.
+
+9. TRADEMARKS AND BRANDING
+
+This License does not grant rights to the HAMAL name, HAMAL logos,
+i1K3R Labs branding, trademarks, service marks, or other brand assets.
+
+You may not use HAMAL branding in a manner that falsely suggests that a
+modified or redistributed version is an official HAMAL product.
+
+Internal Organizations may modify or replace branding for their own
+private internal deployments.
+
+10. COMMERCIAL LICENSE
+
+Commercial product distribution and Commercial Services may be permitted
+under a separate written commercial license issued by the Copyright
+Holder.
+
+For commercial licensing inquiries, contact:
+
+i1K3R Labs
+https://github.com/i1k3r/HAMAL
+
+11. COPYRIGHT
+
+The Software remains protected by applicable copyright laws.
+
+All rights not expressly granted by this License are reserved by the
+Copyright Holder.
+
+The public availability of the source code does not grant rights beyond
+those expressly provided by this License.
+
+12. TERMINATION
+
+The rights granted under this License automatically terminate upon a
+material violation of its terms.
+
+Upon termination, the violating party must cease the prohibited use,
+distribution, or commercial exploitation of the Software or applicable
+Derivative Work.
+
+Rights unrelated to the violation remain unaffected where permitted by
+applicable law.
+
+13. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES,
+OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
+
+14. ACCEPTANCE
+
+By using, modifying, distributing, or deploying the Software, you agree
+to the terms of this License.
