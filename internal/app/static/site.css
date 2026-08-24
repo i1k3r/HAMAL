@@ -1482,30 +1482,33 @@ body {
    -------------------------------------------------------------------------- */
 .participant-bottom-actions {
   width: 100%;
-  margin-top: 1.75rem !important;
+  margin-top: 2rem !important;
   margin-bottom: 0 !important;
+  padding-top: 1rem;
   padding-bottom: max(2.5rem, env(safe-area-inset-bottom, 2.5rem));
   display: block !important;
   flex-shrink: 0 !important;
   box-sizing: border-box;
   clear: both;
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
 }
 
 .btn-close-room-bottom {
   width: 100%;
-  min-height: 48px;
-  padding: 0.75rem 1.5rem;
-  font-size: 0.875rem;
+  min-height: 50px;
+  padding: 0.85rem 1.5rem;
+  font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   border-radius: var(--radius-md);
-  background: transparent;
+  background: var(--bg-surface);
   color: var(--accent-danger);
   border: 1px solid var(--accent-danger-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   cursor: pointer;
   touch-action: manipulation;
   user-select: none;
@@ -1518,6 +1521,7 @@ body {
 .btn-close-room-bottom:focus {
   background: var(--accent-danger-glow);
   border-color: var(--accent-danger);
+  box-shadow: 0 2px 8px var(--accent-danger-glow);
   outline: none;
 }
 
@@ -1528,6 +1532,7 @@ body {
 .close-lock-icon {
   width: 16px;
   height: 16px;
+
   flex-shrink: 0;
 }
 
