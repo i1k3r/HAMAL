@@ -17,6 +17,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/i1k3r/HAMAL/internal/cleanup"
@@ -30,6 +31,14 @@ import (
 
 //go:embed templates/*.html static/*
 var assets embed.FS
+
+// ParticipantRecord tracks an active participant connected to a room.
+type ParticipantRecord struct {
+	ID       string    `json:"id"`
+	IP       string    `json:"ip"`
+	Name     string    `json:"name"`
+	LastSeen time.Time `json:"last_seen"`
+}
 
 type App struct {
 	cfg             config.Config
@@ -46,6 +55,8 @@ type App struct {
 	authLimiter     *IPRateLimiter
 	uploadLimiter   *IPRateLimiter
 	downloadLimiter *IPRateLimiter
+	participantMu   sync.RWMutex
+	participants    map[string]map[string]ParticipantRecord
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*App, error) {
@@ -105,6 +116,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		authLimiter:     authLimiter,
 		uploadLimiter:   uploadLimiter,
 		downloadLimiter: downloadLimiter,
+		participants:    make(map[string]map[string]ParticipantRecord),
 	}
 	routesHandler, err := a.routes()
 	if err != nil {
@@ -113,6 +125,77 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	}
 	a.handler = a.securityHeadersMiddleware(routesHandler)
 	return a, nil
+}
+
+func (a *App) recordParticipant(roomID, ip, userAgent string) {
+	if roomID == "" || ip == "" {
+		return
+	}
+	a.participantMu.Lock()
+	defer a.participantMu.Unlock()
+	if a.participants == nil {
+		a.participants = make(map[string]map[string]ParticipantRecord)
+	}
+	if a.participants[roomID] == nil {
+		a.participants[roomID] = make(map[string]ParticipantRecord)
+	}
+
+	name := "Mobile Device"
+	if strings.Contains(userAgent, "iPhone") || strings.Contains(userAgent, "iPad") {
+		name = "Apple iOS Device"
+	} else if strings.Contains(userAgent, "Android") {
+		name = "Android Device"
+	} else if strings.Contains(userAgent, "Windows") {
+		name = "Windows Device"
+	} else if strings.Contains(userAgent, "Macintosh") {
+		name = "macOS Device"
+	} else if strings.Contains(userAgent, "Linux") {
+		name = "Linux Device"
+	}
+
+	a.participants[roomID][ip] = ParticipantRecord{
+		ID:       ip,
+		IP:       ip,
+		Name:     name,
+		LastSeen: time.Now().UTC(),
+	}
+}
+
+func (a *App) getActiveParticipants(roomID string) []ParticipantRecord {
+	a.participantMu.Lock()
+	defer a.participantMu.Unlock()
+	if a.participants == nil || a.participants[roomID] == nil {
+		return []ParticipantRecord{}
+	}
+
+	cutoff := time.Now().UTC().Add(-60 * time.Second)
+	var active []ParticipantRecord
+	for k, p := range a.participants[roomID] {
+		if p.LastSeen.After(cutoff) {
+			active = append(active, p)
+		} else {
+			delete(a.participants[roomID], k)
+		}
+	}
+	if active == nil {
+		active = []ParticipantRecord{}
+	}
+	return active
+}
+
+func (a *App) getActiveParticipantCount(roomID string) int {
+	return len(a.getActiveParticipants(roomID))
+}
+
+func (a *App) trackParticipantFromRequest(r *http.Request, rm *room.Room, role room.Role) {
+	if role != room.RoleParticipant || rm == nil {
+		return
+	}
+	clientIP := a.clientIP(r)
+	if clientIP == "" {
+		return
+	}
+	a.recordParticipant(rm.ID, clientIP, r.UserAgent())
 }
 
 func (a *App) Close() error {
@@ -513,6 +596,9 @@ func (a *App) routes() (http.Handler, error) {
 			return
 		}
 
+		a.trackParticipantFromRequest(r, rm, role)
+		activeCount := a.getActiveParticipantCount(rm.ID)
+
 		isAuth := a.isParticipantAuthenticated(r.Context(), rm, r)
 
 		var filesList []file.File
@@ -529,6 +615,7 @@ func (a *App) routes() (http.Handler, error) {
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
 		_ = tmpl.ExecuteTemplate(w, "participant.html", map[string]any{
 			"Year":                    time.Now().Year(),
 			"ParticipantToken":        token,
@@ -541,6 +628,7 @@ func (a *App) routes() (http.Handler, error) {
 			"PinAuthenticated":        isAuth,
 			"IsLocked":                rm.IsLocked(),
 			"RetryAfterSeconds":       rm.LockoutRemainingSeconds(),
+			"ParticipantCount":        activeCount,
 			"Files":                   filesList,
 		})
 	})
@@ -690,6 +778,8 @@ func (a *App) routes() (http.Handler, error) {
 			return
 		}
 
+		a.trackParticipantFromRequest(r, rm, room.RoleParticipant)
+
 		sessionToken, err := a.rooms.CreateSession(r.Context(), rm.ID, rm.ExpiresAt)
 		if err != nil {
 			a.logger.Error("failed to create participant session", "error", err)
@@ -778,6 +868,10 @@ func (a *App) routes() (http.Handler, error) {
 			remainingSeconds = 0
 		}
 
+		a.trackParticipantFromRequest(r, rm, role)
+		activeCount := a.getActiveParticipantCount(rm.ID)
+		activeList := a.getActiveParticipants(rm.ID)
+
 		isAuth := (role == room.RoleCreator) || a.isParticipantAuthenticated(r.Context(), rm, r)
 
 		var closeDeadlineStr string
@@ -797,6 +891,8 @@ func (a *App) routes() (http.Handler, error) {
 			"pin_authenticated":         isAuth,
 			"is_locked":                 rm.IsLocked(),
 			"retry_after_seconds":       rm.LockoutRemainingSeconds(),
+			"participant_count":         activeCount,
+			"participants":              activeList,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -929,6 +1025,8 @@ func (a *App) routes() (http.Handler, error) {
 			return
 		}
 
+		a.trackParticipantFromRequest(r, rm, role)
+
 		if role == room.RoleParticipant && rm.PinRequired {
 			if !a.isParticipantAuthenticated(r.Context(), rm, r) {
 				writeJSONError(w, "PIN authentication required", http.StatusUnauthorized)
@@ -1045,6 +1143,8 @@ func (a *App) routes() (http.Handler, error) {
 			}
 		}
 
+		a.trackParticipantFromRequest(r, rm, role)
+
 		filesList, err := a.files.ListReadyFiles(r.Context(), rm.ID)
 		if err != nil {
 			a.logger.Error("failed to list files", "error", err)
@@ -1121,6 +1221,8 @@ func (a *App) routes() (http.Handler, error) {
 				return
 			}
 		}
+
+		a.trackParticipantFromRequest(r, rm, role)
 
 		readyFile, err := a.files.GetReadyFile(r.Context(), rm.ID, fileID)
 		if err != nil {

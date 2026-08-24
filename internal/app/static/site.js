@@ -160,7 +160,7 @@
       },
       tr: {
         executableWarning: "Potansiyel olarak çalıştırılabilir dosya. Yalnızca güvendiğiniz dosyaları açın veya yükleyin.",
-        closeBtn: "Odayı Kapat",
+        closeBtn: "ODAYI ŞİMDİ KAPAT",
         confirmTitle: "Bu transfer odası kapatılsın mı?",
         confirmDesc: "Tüm geçici dosyalar silinecek ve katılımcılar tekrar bağlanamayacaktır.",
         cancelBtn: "İptal",
@@ -628,6 +628,11 @@
         if (countdownEl) {
           countdownEl.textContent = remaining;
         }
+        const ringFill = document.getElementById('closing-ring-fill');
+        if (ringFill) {
+          const ratio = Math.max(0, Math.min(1, remaining / 10));
+          ringFill.style.strokeDashoffset = (314 * (1 - ratio)).toString();
+        }
         if (remaining <= 0) {
           if (closingTimerInterval) {
             clearInterval(closingTimerInterval);
@@ -717,6 +722,13 @@
             return;
           }
 
+          if (typeof data.participant_count === 'number') {
+            const peerCountEl = document.getElementById('participant-count-val');
+            if (peerCountEl) {
+              peerCountEl.textContent = data.participant_count;
+            }
+          }
+
           if (page === 'creator' && lockoutAlert) {
             lockoutAlert.style.display = data.is_locked ? 'flex' : 'none';
           }
@@ -784,14 +796,9 @@
 
       if (files.length === 0) {
         fileListEl.innerHTML = `
-          <div id="no-files-msg" class="empty-state">
-            <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-              <line x1="12" y1="22.08" x2="12" y2="12"></line>
-            </svg>
-            <p class="empty-state-title">No files uploaded yet</p>
-            <p class="empty-state-text">Drop parcels above or browse from your device. All connected participants will receive files in real time.</p>
+          <div id="no-files-msg" class="empty-state empty-state-wrap">
+            <p class="empty-state-title">Nothing here yet.</p>
+            <p class="empty-state-text">Waiting for files.</p>
           </div>
         `;
         return;
@@ -807,8 +814,10 @@
         const mainDiv = document.createElement('div');
         mainDiv.className = 'file-item-main';
 
+        const cat = getFileCategory(file.filename);
         const iconDiv = document.createElement('div');
-        iconDiv.className = 'file-type-icon';
+        iconDiv.className = 'file-type-icon cat-' + cat;
+        iconDiv.dataset.cat = cat;
         iconDiv.innerHTML = getFileIconSVG(file.filename, file.content_type);
 
         const info = document.createElement('div');
@@ -819,9 +828,10 @@
         nameSpan.title = file.filename;
         nameSpan.textContent = file.filename; // XSS-safe
 
+        const ext = (file.filename.split('.').pop() || 'FILE').toUpperCase();
         const metaSpan = document.createElement('span');
         metaSpan.className = 'file-meta font-mono';
-        metaSpan.textContent = `${formatBytes(file.size_bytes)} · ${file.content_type}`;
+        metaSpan.textContent = `${formatBytes(file.size_bytes)} · ${ext}`;
 
         info.appendChild(nameSpan);
         info.appendChild(metaSpan);
@@ -848,31 +858,31 @@
         downloadLink.download = file.filename;
 
         if (isDownloaded) {
-          downloadLink.className = 'btn btn-secondary btn-sm btn-saved';
+          downloadLink.className = 'btn-download-icon btn-saved';
+          downloadLink.title = 'Saved';
           downloadLink.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
-            Saved
           `;
         } else {
-          downloadLink.className = 'btn btn-secondary btn-sm btn-download';
+          downloadLink.className = 'btn-download-icon btn-download';
+          downloadLink.title = 'Download';
           downloadLink.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            Download
           `;
           downloadLink.addEventListener('click', () => {
             markFileDownloaded(file.file_id);
-            downloadLink.className = 'btn btn-secondary btn-sm btn-saved';
+            downloadLink.className = 'btn-download-icon btn-saved';
+            downloadLink.title = 'Saved';
             downloadLink.innerHTML = `
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
-              Saved
             `;
           });
         }
@@ -915,6 +925,9 @@
         const filename = nameEl ? nameEl.textContent : '';
 
         if (iconEl && filename) {
+          const cat = getFileCategory(filename);
+          iconEl.className = 'file-type-icon cat-' + cat;
+          iconEl.dataset.cat = cat;
           iconEl.innerHTML = getFileIconSVG(filename);
         }
 
@@ -939,22 +952,22 @@
         if (!fileId || !link) return;
 
         if (downloadedFiles.has(fileId)) {
-          link.className = 'btn btn-secondary btn-sm btn-saved';
+          link.className = 'btn-download-icon btn-saved';
+          link.title = 'Saved';
           link.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
-            Saved
           `;
         } else {
           link.addEventListener('click', () => {
             markFileDownloaded(fileId);
-            link.className = 'btn btn-secondary btn-sm btn-saved';
+            link.className = 'btn-download-icon btn-saved';
+            link.title = 'Saved';
             link.innerHTML = `
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
-              Saved
             `;
           });
         }
@@ -1667,4 +1680,54 @@
       }
     });
   }
+
+  // --------------------------------------------------------------------------
+  // Mobile Global Navigation & Modal Helpers
+  // --------------------------------------------------------------------------
+  window.switchMobileTab = function(tabName) {
+    document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('active'));
+    const btn = document.getElementById('tab-nav-' + tabName);
+    if (btn) btn.classList.add('active');
+    if (tabName === 'files') {
+      const fileSec = document.querySelector('.files-section');
+      if (fileSec) fileSec.scrollIntoView({ behavior: 'smooth' });
+    } else if (tabName === 'room') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  window.openMobileInfoModal = function() {
+    const modal = document.getElementById('mobile-info-modal');
+    if (modal) modal.style.display = 'flex';
+  };
+
+  window.closeMobileInfoModal = function() {
+    const modal = document.getElementById('mobile-info-modal');
+    if (modal) modal.style.display = 'none';
+  };
+
+  window.closeInfoModalDirect = function(e) {
+    if (e.target && e.target.id === 'mobile-info-modal') {
+      window.closeMobileInfoModal();
+    }
+  };
+
+  window.toggleMobileTheme = function() {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const newTheme = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('hamal_theme', newTheme);
+  };
+
+  window.hideCloseModal = function() {
+    const modal = document.getElementById('close-confirm-modal');
+    if (modal) modal.style.display = 'none';
+  };
+
+  window.closeModalDirect = function(e) {
+    if (e.target && e.target.id === 'close-confirm-modal') {
+      window.hideCloseModal();
+    }
+  };
 })();
+
