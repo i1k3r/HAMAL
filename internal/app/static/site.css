@@ -2213,6 +2213,13 @@ svg {
   cursor: pointer;
   font-size: 14px;
   border-radius: 50%;
+  background: transparent;
+  border: none;
+}
+
+.modal-close-x-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
 }
 
 .danger-icon-circle {
@@ -2228,8 +2235,13 @@ svg {
   margin: 0 auto 12px auto;
 }
 
+.danger-icon-circle svg {
+  width: 22px;
+  height: 22px;
+}
+
 .dialog-title {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 6px;
@@ -2246,6 +2258,65 @@ svg {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Room Inactive / Closed State Mobile Card */
+.card-inactive,
+.empty-state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 36px 20px 32px 20px;
+  gap: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.inactive-icon-wrapper,
+.empty-icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.inactive-icon-wrapper svg,
+.empty-icon-box svg {
+  width: 24px;
+  height: 24px;
+}
+
+.inactive-title,
+.card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.inactive-message,
+.card-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+.inactive-actions {
+  margin-top: 10px;
+  width: 100%;
 }
 
 /* Responsive Narrow Mobile Screens */
@@ -2269,5 +2340,8 @@ svg {
   }
   .file-name {
     font-size: 11.5px;
+  }
+  .card-inactive {
+    padding: 28px 14px 24px 14px;
   }
 }

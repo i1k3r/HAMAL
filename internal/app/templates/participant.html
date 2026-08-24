@@ -58,22 +58,6 @@
     </header>
 
     <main class="mobile-main-content">
-      <!-- Inactive / Closed State -->
-      <section id="card-inactive" class="mobile-card empty-state-card" style="{{if not .Inactive}}display: none;{{end}}">
-        <div class="empty-icon-box">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-        </div>
-        <h2 id="inactive-title" class="card-title">Room Inactive</h2>
-        <p id="inactive-desc" class="card-subtitle">This transfer room has expired or was closed by the host. Any temporary files have been permanently deleted.</p>
-        <div style="margin-top: 1rem;">
-          <a href="/" class="btn btn-secondary btn-full">Return Home</a>
-        </div>
-      </section>
-
       <!-- PIN Authentication Barrier Card -->
       <section id="pin-barrier-card" class="mobile-card" style="{{if or (not .PinRequired) .PinAuthenticated .Inactive}}display: none;{{end}}">
         <div class="pin-card-header">
@@ -103,7 +87,7 @@
       </section>
 
       <!-- Active Participant Room Section -->
-      <section id="room-active-card" class="active-room-wrapper" style="{{if and .PinRequired (not .PinAuthenticated)}}display: none;{{end}}">
+      <section id="room-active-card" class="active-room-wrapper" style="{{if or (and .PinRequired (not .PinAuthenticated)) .Inactive}}display: none;{{end}}">
         <!-- Room Closing Card (Server Authoritative 10s Countdown) -->
         <div id="room-closing-card" class="mobile-card room-closing-card" style="{{if ne .Status "closing"}}display: none;{{end}}">
           <div class="closing-header">
@@ -237,30 +221,30 @@
         </div>
       </section>
 
-      <!-- Inactive Room Fallback State -->
-      <section id="room-inactive-card" class="mobile-card card-inactive" style="display: none;">
+      <!-- Room Closed / Inactive State Card -->
+      <section id="room-inactive-card" class="mobile-card card-inactive" style="{{if not .Inactive}}display: none;{{end}}">
         <div class="inactive-icon-wrapper">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="12" y1="8" x2="12" y2="12"></line>
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
           </svg>
         </div>
-        <h2 id="inactive-title-fb" class="inactive-title">Room Closed</h2>
-        <p id="inactive-message" class="inactive-message">This temporary room has expired or was closed by the creator.</p>
-        <div style="margin-top: 1rem;">
-          <a href="/" class="btn btn-secondary btn-full">Create a New Room</a>
+        <h2 id="inactive-title" class="inactive-title">Room Closed</h2>
+        <p id="inactive-message" class="inactive-message">This temporary room is no longer accessible.</p>
+        <div class="inactive-actions">
+          <a href="/" class="btn btn-primary btn-full">Create a New Room</a>
         </div>
       </section>
     </main>
   </div>
 
   <!-- Participant Close Room Confirmation Modal -->
-  <div id="close-confirm-modal" class="modal-overlay" style="display: none;" onclick="closeModalDirect(event)">
-    <div class="modal-card mobile-dialog-card" onclick="event.stopPropagation()">
-      <div class="modal-close-x-btn" onclick="hideCloseModal()" title="Close">✕</div>
+  <div id="close-confirm-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card mobile-dialog-card">
+      <button type="button" class="modal-close-x-btn" id="participant-modal-close" title="Close">✕</button>
       <div class="danger-icon-circle">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="15" y1="9" x2="9" y2="15"></line>
           <line x1="9" y1="9" x2="15" y2="15"></line>
@@ -269,8 +253,8 @@
       <h3 id="confirm-modal-title" class="dialog-title">Close this room?</h3>
       <p id="confirm-modal-desc" class="dialog-desc">This will disconnect all participants and permanently delete the room and files.</p>
       <div class="dialog-button-stack">
-        <button type="button" id="confirm-close-btn" class="btn btn-danger btn-full">Yes, Close Room</button>
-        <button type="button" id="cancel-close-btn" class="btn btn-secondary btn-full">Cancel</button>
+        <button type="button" id="participant-confirm-close-btn" class="btn btn-danger btn-full">Yes, Close Room</button>
+        <button type="button" id="participant-cancel-close-btn" class="btn btn-secondary btn-full">Cancel</button>
       </div>
     </div>
   </div>

@@ -653,13 +653,26 @@
     function showInactive(title, message) {
       isTerminated = true;
       if (pollTimer) clearTimeout(pollTimer);
-      if (activeCard) activeCard.classList.add('hidden');
-      if (pinCard) pinCard.classList.add('hidden');
-      if (inactiveCard) {
-        if (inactiveTitle) inactiveTitle.textContent = title;
-        if (inactiveMsg) inactiveMsg.textContent = message;
-        inactiveCard.classList.remove('hidden');
-        inactiveCard.style.display = 'flex';
+      if (activeCard) {
+        activeCard.classList.add('hidden');
+        activeCard.style.display = 'none';
+      }
+      if (pinCard) {
+        pinCard.classList.add('hidden');
+        pinCard.style.display = 'none';
+      }
+      const closingCard = document.getElementById('room-closing-card');
+      if (closingCard) {
+        closingCard.style.display = 'none';
+      }
+      const inactiveEl = document.getElementById('room-inactive-card') || document.getElementById('card-inactive') || inactiveCard;
+      if (inactiveEl) {
+        const titleEl = document.getElementById('inactive-title') || inactiveEl.querySelector('h2');
+        const msgEl = document.getElementById('inactive-message') || inactiveEl.querySelector('p');
+        if (titleEl && title) titleEl.textContent = title;
+        if (msgEl && message) msgEl.textContent = message;
+        inactiveEl.classList.remove('hidden');
+        inactiveEl.style.display = 'flex';
       }
     }
 
@@ -958,11 +971,32 @@
         if (res.ok) {
           const data = await res.json();
           if (data.status === 'closed') {
-            showInactive('Room Closed', 'This room was closed.');
+            showInactive('Room Closed', 'This temporary room is no longer accessible.');
             return;
           } else if (data.status === 'expired' || data.remaining_seconds <= 0) {
             showInactive('Room Expired', 'This temporary room has expired.');
             return;
+          } else if (data.status === 'closing') {
+            const closingCard = document.getElementById('room-closing-card');
+            const statusCard = document.querySelector('.room-status-card');
+            const dropzoneCard = document.querySelector('.dropzone-card');
+            const filesSec = document.querySelector('.files-section');
+            const actionsSec = document.querySelector('.participant-bottom-actions');
+
+            if (closingCard) closingCard.style.display = 'block';
+            if (statusCard) statusCard.style.display = 'none';
+            if (dropzoneCard) dropzoneCard.style.display = 'none';
+            if (filesSec) filesSec.style.display = 'none';
+            if (actionsSec) actionsSec.style.display = 'none';
+
+            const countdownEl = document.getElementById('closing-countdown');
+            if (countdownEl && data.closing_remaining_seconds !== undefined) {
+              countdownEl.textContent = String(data.closing_remaining_seconds);
+            }
+            if (data.closing_remaining_seconds <= 0) {
+              showInactive('Room Closed', 'This temporary room is no longer accessible.');
+              return;
+            }
           }
 
           // Authoritative participant count & active peer list
@@ -1197,7 +1231,7 @@
     }
 
     // --------------------------------------------------------------------------
-    // Close Room Modal
+    // Close Room Modal (Creator Desktop & Participant Mobile)
     // --------------------------------------------------------------------------
     const closeBtn = document.getElementById('close-room-btn');
     if (closeBtn) {
@@ -1233,6 +1267,96 @@
           showInactive('Room Closed', 'This temporary transfer room has been closed and all files purged.');
         }
       });
+    }
+
+    // Participant Mobile Close Room Modal & Confirmation
+    const participantCloseBtn = document.getElementById('participant-close-btn');
+    const closeConfirmModal = document.getElementById('close-confirm-modal');
+    const participantModalClose = document.getElementById('participant-modal-close');
+    const participantCancelClose = document.getElementById('participant-cancel-close-btn');
+    const participantConfirmClose = document.getElementById('participant-confirm-close-btn');
+
+    if (participantCloseBtn && closeConfirmModal) {
+      participantCloseBtn.addEventListener('click', () => {
+        closeConfirmModal.style.display = 'flex';
+      });
+
+      if (participantModalClose) {
+        participantModalClose.addEventListener('click', () => {
+          closeConfirmModal.style.display = 'none';
+        });
+      }
+
+      if (participantCancelClose) {
+        participantCancelClose.addEventListener('click', () => {
+          closeConfirmModal.style.display = 'none';
+        });
+      }
+
+      closeConfirmModal.addEventListener('click', (e) => {
+        if (e.target === closeConfirmModal) {
+          closeConfirmModal.style.display = 'none';
+        }
+      });
+
+      if (participantConfirmClose) {
+        participantConfirmClose.addEventListener('click', async () => {
+          participantConfirmClose.disabled = true;
+          participantConfirmClose.textContent = t.closing || 'Closing room…';
+
+          try {
+            const res = await fetch(`/api/v1/rooms/${encodeURIComponent(token)}/close`, {
+              method: 'POST',
+            });
+            closeConfirmModal.style.display = 'none';
+
+            if (res.ok) {
+              const data = await res.json().catch(() => ({}));
+              if (data.status === 'closing') {
+                const closingCard = document.getElementById('room-closing-card');
+                const statusCard = document.querySelector('.room-status-card');
+                const dropzoneCard = document.querySelector('.dropzone-card');
+                const filesSec = document.querySelector('.files-section');
+                const actionsSec = document.querySelector('.participant-bottom-actions');
+
+                if (closingCard) closingCard.style.display = 'block';
+                if (statusCard) statusCard.style.display = 'none';
+                if (dropzoneCard) dropzoneCard.style.display = 'none';
+                if (filesSec) filesSec.style.display = 'none';
+                if (actionsSec) actionsSec.style.display = 'none';
+
+                let count = data.closing_remaining_seconds || 10;
+                const countdownEl = document.getElementById('closing-countdown');
+                const ringFill = document.getElementById('closing-ring-fill');
+                const timer = setInterval(() => {
+                  count--;
+                  if (countdownEl) countdownEl.textContent = String(Math.max(0, count));
+                  if (ringFill) {
+                    const offset = 364 - (364 * (10 - count)) / 10;
+                    ringFill.style.strokeDashoffset = String(offset);
+                  }
+                  if (count <= 0) {
+                    clearInterval(timer);
+                    showInactive('Room Closed', 'This temporary room is no longer accessible.');
+                  }
+                }, 1000);
+              } else {
+                showInactive('Room Closed', 'This temporary room is no longer accessible.');
+              }
+            } else if (res.status === 404 || res.status === 410) {
+              showInactive('Room Closed', 'This temporary room is no longer accessible.');
+            } else {
+              const errData = await res.json().catch(() => ({}));
+              alert(errData.error || t.closeError || 'Failed to close room');
+              participantConfirmClose.disabled = false;
+              participantConfirmClose.textContent = t.confirmBtn || 'Yes, Close Room';
+            }
+          } catch (e) {
+            closeConfirmModal.style.display = 'none';
+            showInactive('Room Closed', 'This temporary room is no longer accessible.');
+          }
+        });
+      }
     }
 
     // --------------------------------------------------------------------------
