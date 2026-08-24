@@ -1,19 +1,19 @@
 {{define "creator.html"}}
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark" dir="ltr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#141312" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#F8F7F4" media="(prefers-color-scheme: light)">
-  <title>HAMAL · Creator Dispatch</title>
+  <meta name="theme-color" content="#0B0D0F" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#F7F8FA" media="(prefers-color-scheme: light)">
+  <title>HAMAL · CREATOR DISPATCH</title>
   <link rel="icon" type="image/svg+xml" href="/static/brand/hamal-app-icon.svg">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/static/brand/hamal-app-icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/site.css">
   <script>
     (function() {
@@ -25,222 +25,306 @@
   </script>
   <script defer src="/static/site.js"></script>
 </head>
-<body data-page="creator" data-token="{{.CreatorToken}}" data-expires="{{.ExpiresAtRFC3339}}" data-participant-token="{{.ParticipantToken}}" data-global-share-enabled="{{.GlobalShareEnabled}}">
+<body data-page="creator" data-role="CREATOR" data-token="{{.CreatorToken}}" data-expires="{{.ExpiresAtRFC3339}}" data-participant-token="{{.ParticipantToken}}" data-global-share-enabled="{{.GlobalShareEnabled}}" data-pin-required="{{.PinRequired}}">
   <div class="app-container">
-    <header class="header-nav">
-      <a href="/" class="brand-wrapper" title="HAMAL">
-        <img src="/static/brand/hamal-logo-light.svg" alt="HAMAL" class="brand-logo logo-light">
-        <img src="/static/brand/hamal-logo-dark.svg" alt="HAMAL" class="brand-logo logo-dark">
-        <span class="header-tag">CREATOR DISPATCH</span>
-      </a>
+    <!-- Persistent Left Navigation Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <a href="/" class="sidebar-brand" title="HAMAL">
+          <img src="/static/brand/hamal-logo-light.svg" alt="HAMAL" class="sidebar-logo logo-light" width="100" height="22">
+          <img src="/static/brand/hamal-logo-dark.svg" alt="HAMAL" class="sidebar-logo logo-dark" width="100" height="22">
+          <span class="header-tag" style="display: none;">CREATOR DISPATCH</span>
+        </a>
 
-      <div class="header-meta">
-        <button type="button" id="theme-toggle-btn" class="theme-toggle-btn" aria-label="Toggle Light / Dark Theme" title="Toggle theme">
-          <!-- Sun Icon (shown in dark mode to switch to light) -->
-          <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="4"></circle>
-            <path d="M12 2v2"></path>
-            <path d="M12 20v2"></path>
-            <path d="m4.93 4.93 1.41 1.41"></path>
-            <path d="m17.66 17.66 1.41 1.41"></path>
-            <path d="M2 12h2"></path>
-            <path d="M20 12h2"></path>
-            <path d="m6.34 17.66-1.41 1.41"></path>
-            <path d="m19.07 4.93-1.41 1.41"></path>
-          </svg>
-          <!-- Moon Icon (shown in light mode to switch to dark) -->
-          <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
-          </svg>
-        </button>
+        <nav class="sidebar-nav">
+          <button type="button" id="nav-btn-room" class="nav-item active">
+            <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            <span>Transfer Room</span>
+          </button>
+          <button type="button" id="nav-btn-files" class="nav-item">
+            <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <span>Files</span>
+            <span id="nav-file-count" class="nav-pill">{{len .Files}}</span>
+          </button>
+          <button type="button" id="nav-btn-about" class="nav-item">
+            <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <span>About</span>
+          </button>
+        </nav>
       </div>
-    </header>
 
-    <div id="room-active-card" class="creator-grid">
-      <!-- Left Column: Room Status & QR Dispatch -->
-      <aside class="dispatch-card card">
-        <div class="card-header">
+      <div class="sidebar-bottom">
+        <div class="lan-status-badge">
+          <span class="status-dot"></span>
+          <span>LAN Connected</span>
+        </div>
+
+        <div class="sidebar-controls">
+          <div class="theme-toggle-group">
+            <button type="button" class="theme-btn" id="theme-btn-light" title="Light Theme" aria-label="Light theme">
+              <svg width="14" height="14" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="4.22" x2="19.78" y2="5.64"></line></svg>
+            </button>
+            <button type="button" class="theme-btn active" id="theme-btn-dark" title="Dark Theme" aria-label="Dark theme">
+              <svg width="14" height="14" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
+          </div>
+          <span id="sidebar-version" class="version-text">v0.8.4</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Dynamic Viewport -->
+    <main class="main-viewport">
+      <!-- 1. Active Transfer Room View -->
+      <div id="room-active-card" class="active-room-layout">
+        <!-- Top Status & Metrics Bar -->
+        <header class="top-metrics-bar">
+          <div id="status-badge" class="room-active-indicator">
+            <span class="status-dot"></span>
+            <span>ROOM ACTIVE</span>
+          </div>
+
+          <div class="metrics-cluster">
+            <div class="metric-tile">
+              <span class="metric-value">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                <span id="metric-connected-count">0</span>
+              </span>
+              <span class="metric-label">CONNECTED</span>
+            </div>
+            <div class="metric-tile">
+              <span class="metric-value metric-countdown" id="countdown">--:--</span>
+              <span class="metric-label">REMAINING</span>
+            </div>
+            <div class="metric-tile">
+              <span class="metric-value" id="metric-transferred-size">0 B</span>
+              <span class="metric-label">TRANSFERRED</span>
+            </div>
+          </div>
+
           <div>
-            <h2 class="card-title">Room Status</h2>
+            <button type="button" id="close-room-btn" class="btn btn-danger-outline btn-sm">Close Room</button>
           </div>
-          <div class="badge-row">
-            <span id="status-badge" class="badge badge-active">
-              <span class="badge-dot"></span>ROOM ACTIVE
-            </span>
-            {{if .PinRequired}}<span class="badge badge-pin">PIN Protected</span>{{end}}
-          </div>
-        </div>
+        </header>
 
-        <div class="room-status-box">
-          <div class="status-label-group">
-            <span class="status-caption">Expires in</span>
-            <span id="countdown" class="countdown-timer">Calculating…</span>
-          </div>
-        </div>
+        <!-- Central 2-Column Instrument Grid -->
+        <div class="instrument-grid">
+          <!-- Left Column: Pairing QR + Dropzone (310px width) -->
+          <div class="column-left">
+            <div class="dispatch-unified-panel">
+              <!-- QR Dispatch Panel -->
+              <div class="qr-panel">
+                <span class="qr-title">SCAN TO CONNECT</span>
 
-        <div class="qr-container">
-          <div id="qr-box" class="qr-box" role="button" tabindex="0" aria-label="Enlarge QR code" aria-expanded="false">
-            <img id="qr-image" src="/api/v1/rooms/{{.ParticipantToken}}/qr.svg" alt="Participant QR Code" width="210" height="210">
-          </div>
-          <div class="qr-label-box">
-            <p class="qr-title">SCAN TO JOIN</p>
-            <p class="qr-subtitle">Point camera on the same local network</p>
-          </div>
-        </div>
+                <div id="qr-box" class="qr-box-wrapper" role="button" tabindex="0" title="Click to enlarge">
+                  <img id="qr-image" src="/api/v1/rooms/{{.ParticipantToken}}/qr.svg" alt="Participant QR Code" width="134" height="134">
+                </div>
 
-        <div class="link-group">
-          <label for="participant-link-input" class="field-label">Participant URL</label>
-          <div class="input-action-row">
-            <input type="text" id="participant-link-input" value="{{.ParticipantURL}}" readonly spellcheck="false">
-            <button type="button" id="copy-link-btn" class="btn btn-secondary btn-sm">Copy</button>
-          </div>
-          <span id="copy-toast" class="toast-msg">✓ Copied to clipboard!</span>
-        </div>
+                {{if .PinRequired}}
+                <div id="pin-display-box" class="pin-display-wrap">
+                  <span class="pin-caption">PIN</span>
+                  <span class="pin-value" style="font-size: 13px; letter-spacing: 0.08em;">PROTECTED</span>
+                </div>
+                {{end}}
 
-        <div class="card-divider"></div>
-
-        <div class="close-room-section">
-          <button type="button" id="close-room-btn" class="btn btn-danger-restrained">Close Room Now</button>
-        </div>
-      </aside>
-
-      <!-- Right Column: Dropzone & File Management -->
-      <section class="content-column">
-        <!-- Participant Lockout Alert (Conditional) -->
-        <div id="lockout-alert" class="alert-box alert-warning" style="{{if not .IsLocked}}display: none;{{end}}">
-          <div class="alert-content">
-            <strong>Participant Access Locked (Cooldown Active)</strong>
-            <p>Too many failed participant PIN attempts. You can wait for cooldown or reset access now.</p>
-          </div>
-          <button type="button" id="unlock-room-btn" class="btn btn-secondary btn-sm">Reset PIN Lockout</button>
-        </div>
-
-        <!-- Upload Dropzone Card -->
-        <div class="card">
-          <div id="dropzone" class="dropzone">
-            <svg class="dropzone-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="17 8 12 3 7 8"></polyline>
-              <line x1="12" y1="3" x2="12" y2="15"></line>
-            </svg>
-            <p id="dropzone-title" class="dropzone-title">Drag & drop files here</p>
-            <p class="dropzone-hint">or <label for="file-input" class="browse-link">click to browse</label></p>
-            <input type="file" id="file-input" multiple style="display: none;">
-          </div>
-
-          <div id="upload-progress-container" class="upload-progress-container" style="display: none;">
-            <div class="progress-info">
-              <span id="upload-filename" class="upload-filename">Uploading file…</span>
-              <span id="upload-percent" class="upload-percent">0%</span>
-            </div>
-            <div class="progress-bar-bg">
-              <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
-            </div>
-            <div id="upload-error" class="error-msg" style="display: none;"></div>
-          </div>
-        </div>
-
-        <!-- Room Files Card -->
-        <div class="card">
-          <div class="files-header">
-            <div class="files-title-group">
-              <h3 class="files-title">Files in Room</h3>
-              <span id="file-count" class="count-pill">{{len .Files}}</span>
-            </div>
-          </div>
-
-          <div id="file-list" class="file-list">
-            {{if .Files}}
-              {{range .Files}}
-              <div class="file-item" data-file-id="{{.ID}}">
-                <div class="file-item-main">
-                  <div class="file-type-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
-                      <polyline points="14 2 14 8 20 8"></polyline>
-                    </svg>
+                <div class="address-row">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span class="address-label">ROOM ADDRESS</span>
+                    <span id="copy-toast" class="toast-badge">✓ Copied</span>
                   </div>
-                  <div class="file-info">
-                    <span class="file-name" title="{{.OriginalFilename}}">{{.OriginalFilename}}</span>
-                    <span class="file-meta font-mono">{{.SizeBytes}} bytes <span class="meta-separator">·</span> {{.ContentType}}</span>
+                  <div class="address-input-wrap">
+                    <input type="text" id="participant-link-input" class="address-input" value="{{.ParticipantURL}}" readonly spellcheck="false">
+                    <button type="button" id="copy-link-btn" class="btn-icon-copy" title="Copy Link" aria-label="Copy Link">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    </button>
                   </div>
                 </div>
-                <div class="file-actions">
-                  {{if $.GlobalShareEnabled}}
-                  <button type="button" class="btn btn-secondary btn-sm btn-share-link" data-file-id="{{.ID}}" data-file-name="{{.OriginalFilename}}">Share Link</button>
+              </div>
+
+              <!-- Dropzone Upload Panel (Fills remaining vertical space) -->
+              <div id="dropzone" class="dropzone-panel">
+                <div class="dropzone-icon" id="dropzone-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                </div>
+                <span id="dropzone-title" class="dropzone-title">UPLOAD FILES</span>
+                <span id="dropzone-hint" class="dropzone-hint">Tap or drag files here</span>
+                <input type="file" id="file-input" multiple style="display: none;">
+
+                <div id="upload-progress-container" class="upload-progress-box" style="display: none;">
+                  <div class="upload-progress-info">
+                    <span id="upload-filename">Uploading file…</span>
+                    <span id="upload-percent">0%</span>
+                  </div>
+                  <div class="progress-track">
+                    <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+                  </div>
+                  <div id="upload-error" class="form-hint" style="color: var(--accent-danger); display: none;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: 3 Separate Card Islands (Participants, Activity, Files) -->
+          <div class="column-right">
+            <!-- 1. Connected Participants Card -->
+            <section class="section-group">
+              <div class="section-header">
+                <span class="section-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                  <span>CONNECTED PARTICIPANTS</span> (<span id="participant-count">0</span>)
+                </span>
+              </div>
+              <div id="participant-list" class="participant-list">
+                <!-- Populated dynamically via authoritative backend API -->
+              </div>
+            </section>
+
+            <!-- 2. Recent Activity Card -->
+            <section class="section-group">
+              <div class="section-header">
+                <span class="section-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  <span>RECENT ACTIVITY</span>
+                </span>
+              </div>
+              <div id="activity-list" class="activity-list">
+                <!-- Populated dynamically -->
+              </div>
+            </section>
+
+            <!-- 3. Files in Room Card -->
+            <section class="section-group">
+              <div class="section-header">
+                <span class="section-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                  <span>FILES IN ROOM</span> (<span id="file-count">{{len .Files}}</span>)
+                </span>
+              </div>
+              <div id="file-list" class="file-list-container">
+                {{if .Files}}
+                  {{range .Files}}
+                  <div class="file-row" data-file-id="{{.ID}}" data-filename="{{.OriginalFilename}}" data-size="{{.SizeBytes}}" data-content-type="{{.ContentType}}">
+                    <div class="file-main">
+                      <div class="file-icon-box">
+                        <svg class="pixel-icon pixel-icon-generic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                      </div>
+                      <div class="file-text-col">
+                        <span class="file-title" title="{{.OriginalFilename}}">{{.OriginalFilename}}</span>
+                        <span class="file-specs">{{.SizeBytes}} B</span>
+                      </div>
+                    </div>
+                    <div class="file-actions">
+                      {{if $.GlobalShareEnabled}}
+                      <button type="button" class="btn btn-secondary btn-sm btn-share-link" data-file-id="{{.ID}}" data-file-name="{{.OriginalFilename}}">Share Link</button>
+                      {{end}}
+                      <a href="/api/v1/rooms/{{$.CreatorToken}}/files/{{.ID}}" download="{{.OriginalFilename}}" class="btn btn-sm btn-download">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Download
+                      </a>
+                    </div>
+                  </div>
                   {{end}}
-                  <a href="/api/v1/rooms/{{$.CreatorToken}}/files/{{.ID}}" download="{{.OriginalFilename}}" class="btn btn-secondary btn-sm btn-download">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                      <polyline points="7 10 12 15 17 10"></polyline>
-                      <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    Download
-                  </a>
-                </div>
-              </div>
-              {{end}}
-            {{else}}
-              <div id="no-files-msg" class="empty-state">
-                <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
-                </svg>
-                <p class="empty-state-title">No files uploaded yet</p>
-                <p class="empty-state-text">Drop parcels above or browse from your device. All connected participants will receive files in real time.</p>
-              </div>
-            {{end}}
-          </div>
-        </div>
-
-        {{if .GlobalShareEnabled}}
-        <div class="shares-section card">
-          <div class="files-header">
-            <div class="files-title-group">
-              <h3 class="files-title">Active Global Shares</h3>
-              <span id="share-count" class="count-pill">{{len .Shares}}</span>
-            </div>
-          </div>
-          <div id="share-list" class="file-list">
-            {{if .Shares}}
-              {{range .Shares}}
-              <div class="file-item share-item" data-share-id="{{.ID}}">
-                <div class="file-item-main">
-                  <div class="file-info">
-                    <span class="file-name font-mono">Share ID: {{.ID}}</span>
-                    <span class="file-meta font-mono">Status: {{.Status}} <span class="meta-separator">·</span> Expires: {{.ExpiresAt.Format "15:04:05 UTC"}}</span>
+                {{else}}
+                  <div id="no-files-msg" class="empty-state-box">
+                    <p class="empty-state-title">Nothing here yet.</p>
+                    <p class="empty-state-lead">Waiting for files. Drag files above or send parcels from your phone.</p>
                   </div>
-                </div>
-                <div class="file-actions">
-                  <button type="button" class="btn btn-danger btn-sm btn-revoke-share" data-share-id="{{.ID}}">Revoke</button>
-                </div>
+                {{end}}
               </div>
-              {{end}}
-            {{else}}
-              <div id="no-shares-msg" class="empty-state" style="padding: 1.5rem 1rem;">
-                <p class="empty-state-text">No active external shares.</p>
-              </div>
-            {{end}}
+            </section>
           </div>
         </div>
-        {{end}}
-      </section>
+      </div>
+
+      <!-- 2. Room Inactive / Closed State -->
+      <div id="room-inactive-card" class="state-view hidden" style="align-items: center; justify-content: center; padding: 40px;">
+        <div class="panel" style="max-width: 440px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px;">
+          <div class="close-modal-icon" style="color: var(--text-muted); background: var(--bg-elevated); border-color: var(--border-color);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          </div>
+          <h2 class="hero-title" style="font-size: 20px;" id="inactive-title">Room Closed</h2>
+          <p class="hero-lead" style="font-size: 13px;" id="inactive-message">This temporary transfer room has been closed and all files purged.</p>
+          <a href="/" class="btn btn-primary" style="margin-top: 8px;">Create New Room</a>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal Backdrop & Dialogs -->
+  <div id="modal-backdrop" class="modal-backdrop hidden">
+    <!-- Close Room Confirmation Modal -->
+    <div id="modal-close-confirm" class="modal-dialog hidden">
+      <div class="modal-body close-modal-content">
+        <div class="close-modal-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+        </div>
+        <h3 class="close-modal-title">Close this room?</h3>
+        <p class="close-modal-desc">This will disconnect all participants and permanently delete the room and files.</p>
+        <div class="close-modal-actions">
+          <button type="button" id="confirm-close-btn" class="btn btn-danger">Yes, Close Room</button>
+          <button type="button" class="btn btn-secondary" id="modal-close-cancel">Cancel</button>
+        </div>
+      </div>
     </div>
 
-    <!-- Global Share Modal (Preserved) -->
-    <div id="share-modal" class="modal-overlay" style="display: none;">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3 class="card-title">Share File Externally</h3>
-          <button type="button" id="close-modal-btn" class="modal-close-btn">&times;</button>
+    <!-- About Modal -->
+    <div id="modal-about" class="modal-dialog hidden">
+      <div class="modal-header">
+        <div class="sidebar-brand">
+          <img src="/static/brand/hamal-logo-light.svg" alt="HAMAL" class="sidebar-logo logo-light" width="90" height="20">
+          <img src="/static/brand/hamal-logo-dark.svg" alt="HAMAL" class="sidebar-logo logo-dark" width="90" height="20">
         </div>
-        <p class="card-subtitle" id="modal-file-subtitle" style="margin-bottom: 1.25rem;">Generate a temporary, public download link for this file.</p>
-        
+        <button type="button" class="modal-close-btn" id="modal-about-close" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="font-mono" style="font-size: 12px; color: var(--accent-amber);">FAST · PRIVATE · TEMPORARY · LOCAL</span>
+          <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">v0.8.4</span>
+        </div>
+        <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
+          HAMAL is a quiet, precise digital courier designed to move files point-to-point on your local network without cloud storage, accounts, or telemetry.
+        </p>
+        <div style="background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px;">
+          <p style="font-size: 12px; font-weight: 600; color: var(--text-primary);">Thank you for using HAMAL.</p>
+          <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+            <span>Have a suggestion or found a bug? Email us at</span>
+            <a href="mailto:hamalapp@outlook.com?subject=HAMAL%20Feedback" style="color: var(--accent-amber); text-decoration: none;">hamalapp@outlook.com</a>
+          </p>
+        </div>
+        <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+          <button type="button" class="btn btn-secondary btn-sm" id="modal-about-dismiss">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR Lightbox Modal -->
+    <div id="modal-qr" class="modal-dialog modal-dialog-qr hidden">
+      <div class="modal-header">
+        <span class="font-mono" style="font-size: 12px; font-weight: 700; color: var(--accent-success);">● ROOM ACTIVE</span>
+        <button type="button" class="modal-close-btn" id="modal-qr-close" aria-label="Close">✕</button>
+      </div>
+      <div class="qr-lightbox-body">
+        <div id="qr-lightbox-box" class="qr-lightbox-container">
+          <!-- Image cloned here -->
+        </div>
+        <p class="font-mono" style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-top: 14px;">SCAN TO CONNECT</p>
+        <p style="font-size: 12px; color: var(--text-secondary);">Point camera on the same local network</p>
+      </div>
+    </div>
+
+    {{if .GlobalShareEnabled}}
+    <!-- Global Share Modal -->
+    <div id="share-modal" class="modal-dialog hidden">
+      <div class="modal-header">
+        <h3 class="panel-title" style="font-size: 14px;">Share File Externally</h3>
+        <button type="button" id="close-modal-btn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="panel-subtitle" id="modal-file-subtitle" style="margin-bottom: 14px;">Generate a temporary, public download link for this file.</p>
         <form id="create-share-form">
           <input type="hidden" id="modal-file-id" value="">
-          <div class="form-group">
-            <label for="share-ttl-select" class="field-label" style="display:block; margin-bottom: 0.5rem;">Link Lifetime</label>
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="share-ttl-select" class="form-label">LINK LIFETIME</label>
             <select id="share-ttl-select" name="ttl_seconds" class="form-select">
               <option value="900">15 Minutes</option>
               <option value="3600" selected>1 Hour</option>
@@ -251,40 +335,20 @@
           <button type="submit" id="generate-share-btn" class="btn btn-primary" style="width: 100%;">Create Share Link</button>
         </form>
 
-        <div id="share-result-box" style="display: none; margin-top: 1.5rem;">
-          <div class="link-group">
-            <label for="generated-share-input" class="field-label">Public Share URL</label>
-            <div class="input-action-row">
-              <input type="text" id="generated-share-input" readonly value="">
+        <div id="share-result-box" style="display: none; margin-top: 16px;">
+          <div class="address-row">
+            <span class="address-label">PUBLIC SHARE URL</span>
+            <div class="address-input-wrap">
+              <input type="text" id="generated-share-input" class="address-input" readonly value="">
               <button type="button" id="copy-share-btn" class="btn btn-secondary btn-sm">Copy</button>
             </div>
-            <span id="copy-share-toast" class="toast-msg">✓ Copied to clipboard!</span>
+            <span id="copy-share-toast" class="toast-badge">✓ Copied to clipboard!</span>
           </div>
         </div>
-        <div id="share-error-box" class="error-msg" style="display: none; margin-top: 1rem;"></div>
+        <div id="share-error-box" class="form-hint" style="color: var(--accent-danger); display: none; margin-top: 10px;"></div>
       </div>
     </div>
-
-    <!-- Room Inactive State -->
-    <section id="room-inactive-card" class="card card-inactive" style="display: none;">
-      <div class="inactive-icon-wrapper">
-        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-        </svg>
-      </div>
-      <h2 id="inactive-title" class="inactive-title">Room Inactive</h2>
-      <p id="inactive-message" class="inactive-message">This temporary room is no longer accessible.</p>
-      <div>
-        <a href="/" class="btn btn-primary">Create a New Room</a>
-      </div>
-    </section>
-
-    <footer>
-      <p>© {{.Year}} HAMAL · Courier File Transfer · Storage and Tokens Isolated</p>
-      <p class="footer-signature">© 2026 i1k3r</p>
-    </footer>
+    {{end}}
   </div>
 </body>
 </html>
