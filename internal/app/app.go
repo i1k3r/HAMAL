@@ -803,6 +803,11 @@ func (a *App) routes() (http.Handler, error) {
 			MaxAge:   maxAge,
 		})
 
+		if !strings.HasPrefix(contentType, "application/json") && strings.Contains(r.Header.Get("Accept"), "text/html") {
+			http.Redirect(w, r, "/r/"+token, http.StatusSeeOther)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"status": "authenticated",

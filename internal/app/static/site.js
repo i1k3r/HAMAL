@@ -1003,11 +1003,23 @@
           renderParticipantList(data.participants || [], data.participant_count);
 
           if (page === 'participant' && data.pin_required && !data.pin_authenticated) {
-            if (pinCard) pinCard.classList.remove('hidden');
-            if (activeCard) activeCard.classList.add('hidden');
+            if (pinCard) {
+              pinCard.classList.remove('hidden');
+              pinCard.style.display = 'block';
+            }
+            if (activeCard) {
+              activeCard.classList.add('hidden');
+              activeCard.style.display = 'none';
+            }
           } else if (page === 'participant') {
-            if (pinCard) pinCard.classList.add('hidden');
-            if (activeCard) activeCard.classList.remove('hidden');
+            if (pinCard) {
+              pinCard.classList.add('hidden');
+              pinCard.style.display = 'none';
+            }
+            if (activeCard) {
+              activeCard.classList.remove('hidden');
+              activeCard.style.display = 'block';
+            }
           }
         }
 
@@ -1444,6 +1456,121 @@
               toast.classList.add('show');
               setTimeout(() => toast.classList.remove('show'), 2000);
             }
+          }
+        }
+      });
+    }
+
+    // --------------------------------------------------------------------------
+    // Participant PIN Authentication Form
+    // --------------------------------------------------------------------------
+    const pinForm = document.getElementById('pin-form');
+    const pinInput = document.getElementById('participant-pin-input');
+    const unlockBtn = document.getElementById('unlock-btn');
+    const pinError = document.getElementById('pin-error');
+    const pinCooldown = document.getElementById('pin-cooldown');
+    const pinCooldownText = document.getElementById('pin-cooldown-text');
+
+    if (pinForm) {
+      pinForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const pinVal = pinInput ? pinInput.value.trim() : '';
+        if (!pinVal) return;
+
+        if (unlockBtn) {
+          unlockBtn.disabled = true;
+          unlockBtn.textContent = 'Verifying…';
+        }
+        if (pinError) {
+          pinError.style.display = 'none';
+          pinError.textContent = '';
+        }
+
+        try {
+          const res = await fetch(`/api/v1/rooms/${encodeURIComponent(token)}/auth/pin`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify({ pin: pinVal }),
+          });
+
+          if (res.ok) {
+            // PIN authenticated successfully!
+            if (pinCard) {
+              pinCard.style.display = 'none';
+              pinCard.classList.add('hidden');
+            }
+            if (activeCard) {
+              activeCard.style.display = 'block';
+              activeCard.classList.remove('hidden');
+            }
+            // Trigger immediate room and files polling
+            if (pollTimer) clearTimeout(pollTimer);
+            pollStatus();
+          } else {
+            const data = await res.json().catch(() => ({}));
+            if (res.status === 429) {
+              const retryAfter = data.retry_after_seconds || 30;
+              if (pinCooldown) {
+                pinCooldown.style.display = 'block';
+                if (pinCooldownText) {
+                  pinCooldownText.textContent = `Too many failed attempts. Cooldown active (${retryAfter}s).`;
+                }
+              }
+              if (pinInput) pinInput.disabled = true;
+              if (unlockBtn) {
+                unlockBtn.disabled = true;
+                unlockBtn.textContent = 'Locked Out';
+              }
+              let rem = retryAfter;
+              const cdTimer = setInterval(() => {
+                rem--;
+                if (pinCooldownText) {
+                  pinCooldownText.textContent = `Too many failed attempts. Cooldown active (${rem}s).`;
+                }
+                if (rem <= 0) {
+                  clearInterval(cdTimer);
+                  if (pinCooldown) pinCooldown.style.display = 'none';
+                  if (pinInput) {
+                    pinInput.disabled = false;
+                    pinInput.value = '';
+                    pinInput.focus();
+                  }
+                  if (unlockBtn) {
+                    unlockBtn.disabled = false;
+                    unlockBtn.textContent = 'Unlock Room';
+                  }
+                }
+              }, 1000);
+            } else {
+              if (pinError) {
+                let msg = data.error || 'Incorrect PIN';
+                if (data.remaining_attempts !== undefined) {
+                  msg += ` (${data.remaining_attempts} attempts remaining)`;
+                }
+                pinError.textContent = msg;
+                pinError.style.display = 'block';
+              }
+              if (unlockBtn) {
+                unlockBtn.disabled = false;
+                unlockBtn.textContent = 'Unlock Room';
+              }
+              if (pinInput) {
+                pinInput.value = '';
+                pinInput.focus();
+              }
+            }
+          }
+        } catch (err) {
+          if (pinError) {
+            pinError.textContent = 'Network error. Please try again.';
+            pinError.style.display = 'block';
+          }
+          if (unlockBtn) {
+            unlockBtn.disabled = false;
+            unlockBtn.textContent = 'Unlock Room';
           }
         }
       });
