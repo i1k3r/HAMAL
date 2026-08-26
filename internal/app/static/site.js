@@ -1232,7 +1232,14 @@
       qrBox.addEventListener('click', () => {
         const lightboxBox = document.getElementById('qr-lightbox-box');
         if (lightboxBox) {
-          lightboxBox.innerHTML = `<img src="${qrImage.src}" alt="Participant QR Code" width="220" height="220" style="width: 100%; height: 100%;">`;
+          const lightboxImage = document.createElement('img');
+          lightboxImage.src = qrImage.src;
+          lightboxImage.alt = 'Participant QR Code';
+          lightboxImage.width = 220;
+          lightboxImage.height = 220;
+          lightboxImage.style.width = '100%';
+          lightboxImage.style.height = '100%';
+          lightboxBox.replaceChildren(lightboxImage);
         }
         showModal('modal-qr');
       });
@@ -1241,7 +1248,7 @@
     if (modalQrClose) {
       modalQrClose.addEventListener('click', closeAllModals);
     }
-
+    
     // --------------------------------------------------------------------------
     // Close Room Modal (Creator Desktop & Participant Mobile)
     // --------------------------------------------------------------------------
