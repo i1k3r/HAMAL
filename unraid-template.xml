@@ -11,7 +11,7 @@
   <Category>Tools: Productivity: Network:Web</Category>
   <Icon>https://raw.githubusercontent.com/i1k3r/HAMAL/main/assets/hamal-icon.png</Icon>
   <WebUI>http://[IP]:[PORT:7700]</WebUI>
-  <ExtraParams>--read-only --tmpfs /tmp --security-opt no-new-privileges:true</ExtraParams>
+  <ExtraParams>--read-only --tmpfs /tmp --security-opt no-new-privileges:true --user 99:100</ExtraParams>
   <Networking>
     <Mode>bridge</Mode>
     <Publish>
@@ -37,6 +37,6 @@
     </Variable>
   </Environment>
   <Config Name="WebUI Port" Target="7700" Default="7700" Mode="tcp" Description="Web interface port" Type="Port" Display="always" Required="true" Mask="false">7700</Config>
-  <Config Name="Appdata Storage" Target="/data" Default="/mnt/user/appdata/hamal" Mode="rw" Description="Persistent storage directory for SQLite database, uploaded files, and server secrets (must be owned/writable by UID:GID 10001:10001)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/hamal</Config>
+  <Config Name="Appdata Storage" Target="/data" Default="/mnt/user/appdata/hamal" Mode="rw" Description="Persistent storage directory for SQLite database, uploaded files, and server secrets. The container runs as Unraid's standard UID:GID 99:100." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/hamal</Config>
   <Config Name="Timezone" Target="TZ" Default="Europe/Istanbul" Description="Container timezone" Type="Variable" Display="always" Required="false" Mask="false">Europe/Istanbul</Config>
 </Container>
