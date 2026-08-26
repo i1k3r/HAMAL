@@ -139,6 +139,7 @@ HAMAL is configured via environment variables:
 | `LAN_DROP_LOG_FORMAT` | `json` | Log format (`json` or `text`) |
 | `LAN_DROP_LOG_LEVEL` | `info` | Log verbosity (`debug`, `info`, `warn`, `error`) |
 | `LAN_DROP_SECURE_COOKIES` | `auto` | Cookie security (`auto`, `true`, `false`) |
+| `LAN_DROP_TRUSTED_PROXIES` | *(empty)* | Comma-separated trusted proxy IPs/CIDRs. When using an HTTPS-terminating reverse proxy, configure this or set `LAN_DROP_SECURE_COOKIES=true` so session cookies receive the `Secure` attribute. |
 
 ---
 
@@ -172,5 +173,4 @@ Organizations may freely use, modify, fork, and deploy HAMAL for their own
 internal operations, including commercial business operations.
 
 Commercial redistribution, resale, productization, and offering HAMAL or
-derivative works as a commercial service require separate permission from
-the copyright holder.
+derivative works as a commercial service require separate permission from the copyright holder.
