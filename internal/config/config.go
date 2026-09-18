@@ -23,6 +23,8 @@ type Config struct {
 	MaxFileSize              int64
 	MaxRoomSize              int64
 	MaxFilesPerRoom          int
+	MaxTextSize              int64
+	MaxTextsPerRoom          int
 	MaxTotalStorage          int64
 	MinFreeSpace             int64
 	CleanupInterval          time.Duration
@@ -50,6 +52,7 @@ func Default() Config {
 		ListenAddr: ":7700", DataDir: dataDir, DBPath: filepath.Join(dataDir, "lan-drop.db"),
 		MaxTTL: 24 * time.Hour, DefaultTTL: time.Hour, MinTTL: 5 * time.Minute,
 		MaxFileSize: 10 << 30, MaxRoomSize: 10 << 30, MaxFilesPerRoom: 100,
+		MaxTextSize: 64 << 10, MaxTextsPerRoom: 200,
 		MaxTotalStorage: 100 << 30, MinFreeSpace: 5 << 30,
 		CleanupInterval: time.Minute, CleanupBatchSize: 50,
 		StagingMaxAge: 15 * time.Minute, OrphanGracePeriod: 10 * time.Minute, ClosedRoomRetention: 0,
@@ -124,6 +127,12 @@ func LoadFromEnv() (Config, error) {
 		return c, err
 	}
 	if c.MaxRoomSize, err = envBytes("LAN_DROP_MAX_ROOM_SIZE", c.MaxRoomSize); err != nil {
+		return c, err
+	}
+	if c.MaxTextSize, err = envBytes("LAN_DROP_MAX_TEXT_SIZE", c.MaxTextSize); err != nil {
+		return c, err
+	}
+	if c.MaxTextsPerRoom, err = envInt("LAN_DROP_MAX_TEXTS_PER_ROOM", c.MaxTextsPerRoom); err != nil {
 		return c, err
 	}
 	if c.MaxTotalStorage, err = envBytes("LAN_DROP_MAX_TOTAL_STORAGE", c.MaxTotalStorage); err != nil {
@@ -201,8 +210,8 @@ func (c Config) Validate() error {
 	if c.MaxShareTTL <= 0 || c.DefaultShareTTL <= 0 || c.MaxShareTTL < c.DefaultShareTTL {
 		return fmt.Errorf("share TTL values must satisfy 0 < default <= maximum")
 	}
-	if c.MaxFileSize <= 0 || c.MaxRoomSize <= 0 || c.MaxTotalStorage <= 0 || c.MinFreeSpace < 0 || c.MaxFilesPerRoom <= 0 {
-		return fmt.Errorf("storage limits must be positive (minimum free space may be zero)")
+	if c.MaxFileSize <= 0 || c.MaxRoomSize <= 0 || c.MaxTotalStorage <= 0 || c.MinFreeSpace < 0 || c.MaxFilesPerRoom <= 0 || c.MaxTextSize <= 0 || c.MaxTextsPerRoom <= 0 {
+		return fmt.Errorf("storage limits and text limits must be positive (minimum free space may be zero)")
 	}
 	if c.CleanupInterval <= 0 || c.CleanupBatchSize <= 0 || c.StagingMaxAge <= 0 || c.OrphanGracePeriod <= 0 || c.ClosedRoomRetention < 0 || c.UploadIdleTimeout <= 0 {
 		return fmt.Errorf("cleanup parameters and upload idle timeout must be positive (closed room retention may be zero)")

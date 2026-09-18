@@ -2,8 +2,10 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,6 +29,7 @@ import (
 	"github.com/i1k3r/HAMAL/internal/room"
 	"github.com/i1k3r/HAMAL/internal/share"
 	"github.com/i1k3r/HAMAL/internal/storage"
+	"github.com/i1k3r/HAMAL/internal/text"
 )
 
 //go:embed templates/*.html static/*
@@ -46,6 +49,7 @@ type App struct {
 	paths           storage.Paths
 	rooms           *room.Store
 	files           *file.Store
+	texts           *text.Store
 	shares          *share.Store
 	cleanupWorker   *cleanup.Worker
 	logger          *slog.Logger
@@ -54,6 +58,7 @@ type App struct {
 	roomLimiter     *IPRateLimiter
 	authLimiter     *IPRateLimiter
 	uploadLimiter   *IPRateLimiter
+	textLimiter     *IPRateLimiter
 	downloadLimiter *IPRateLimiter
 	participantMu   sync.RWMutex
 	participants    map[string]map[string]ParticipantRecord
@@ -76,6 +81,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 
 	roomStore := room.NewStore(db, cfg.ServerSecret)
 	shareStore := share.NewStore(db, cfg.ServerSecret)
+	textStore := text.NewStore(db)
 	quotaManager := file.NewQuotaManager()
 	fileStore := file.NewStore(db, paths, quotaManager, file.StoreOptions{
 		MaxTotalStorage: cfg.MaxTotalStorage,
@@ -100,6 +106,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	roomLimiter := NewIPRateLimiter(cfg.ShareManagementRateLimit, cfg.ShareManagementRateLimit/3)
 	authLimiter := NewIPRateLimiter(cfg.ShareManagementRateLimit, cfg.ShareManagementRateLimit/3)
 	uploadLimiter := NewIPRateLimiter(cfg.ShareManagementRateLimit*2, cfg.ShareManagementRateLimit)
+	textLimiter := NewIPRateLimiter(cfg.ShareManagementRateLimit*2, cfg.ShareManagementRateLimit)
 	downloadLimiter := NewIPRateLimiter(cfg.ShareAccessRateLimit, cfg.ShareAccessRateLimit/6)
 
 	a := &App{
@@ -108,6 +115,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		paths:           paths,
 		rooms:           roomStore,
 		files:           fileStore,
+		texts:           textStore,
 		shares:          shareStore,
 		cleanupWorker:   cleanupWorker,
 		logger:          logger,
@@ -115,6 +123,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		roomLimiter:     roomLimiter,
 		authLimiter:     authLimiter,
 		uploadLimiter:   uploadLimiter,
+		textLimiter:     textLimiter,
 		downloadLimiter: downloadLimiter,
 		participants:    make(map[string]map[string]ParticipantRecord),
 	}
@@ -438,6 +447,31 @@ func (a *App) getSessionCookie(r *http.Request, roomID string) string {
 	return c.Value
 }
 
+func (a *App) getClientSessionID(r *http.Request, roomID string) string {
+	if sess := strings.TrimSpace(r.Header.Get("X-Client-Session-ID")); sess != "" {
+		if len(sess) <= 128 {
+			return sess
+		}
+	}
+	if sess := strings.TrimSpace(r.URL.Query().Get("session_id")); sess != "" {
+		if len(sess) <= 128 {
+			return sess
+		}
+	}
+	if c, err := r.Cookie("hamal_client_session_" + roomID); err == nil {
+		if sess := strings.TrimSpace(c.Value); sess != "" && len(sess) <= 128 {
+			return sess
+		}
+	}
+	return ""
+}
+
+func generateEphemeralSessionID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
 func (a *App) isParticipantAuthenticated(ctx context.Context, rm *room.Room, r *http.Request) bool {
 	if !rm.PinRequired {
 		return true
@@ -547,6 +581,11 @@ func (a *App) routes() (http.Handler, error) {
 			sharesList = []share.Share{}
 		}
 
+		textsList, _ := a.texts.ListRoomTexts(r.Context(), rm.ID)
+		if textsList == nil {
+			textsList = []text.Text{}
+		}
+
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = tmpl.ExecuteTemplate(w, "creator.html", map[string]any{
 			"Year":               time.Now().Year(),
@@ -558,6 +597,8 @@ func (a *App) routes() (http.Handler, error) {
 			"PinRequired":        rm.PinRequired,
 			"IsLocked":           rm.IsLocked(),
 			"Files":              filesList,
+			"Texts":              textsList,
+			"MaxTextSize":        a.cfg.MaxTextSize,
 			"GlobalShareEnabled": a.cfg.GlobalShareEnabled,
 			"Shares":             sharesList,
 		})
@@ -584,6 +625,8 @@ func (a *App) routes() (http.Handler, error) {
 					"IsLocked":          false,
 					"RetryAfterSeconds": 0,
 					"Files":             []file.File{},
+					"Texts":             []text.Text{},
+					"MaxTextSize":       a.cfg.MaxTextSize,
 				})
 				return
 			}
@@ -602,11 +645,16 @@ func (a *App) routes() (http.Handler, error) {
 		isAuth := a.isParticipantAuthenticated(r.Context(), rm, r)
 
 		var filesList []file.File
+		var textsList []text.Text
 		if !rm.PinRequired || isAuth {
 			filesList, _ = a.files.ListReadyFiles(r.Context(), rm.ID)
+			textsList, _ = a.texts.ListRoomTexts(r.Context(), rm.ID)
 		}
 		if filesList == nil {
 			filesList = []file.File{}
+		}
+		if textsList == nil {
+			textsList = []text.Text{}
 		}
 
 		var closeDeadlineStr string
@@ -630,6 +678,8 @@ func (a *App) routes() (http.Handler, error) {
 			"RetryAfterSeconds":       rm.LockoutRemainingSeconds(),
 			"ParticipantCount":        activeCount,
 			"Files":                   filesList,
+			"Texts":                   textsList,
+			"MaxTextSize":             a.cfg.MaxTextSize,
 		})
 	})
 
@@ -681,6 +731,8 @@ func (a *App) routes() (http.Handler, error) {
 			writeJSONError(w, "failed to create room", http.StatusInternalServerError)
 			return
 		}
+
+		_, _ = a.texts.CreateServerText(r.Context(), created.ID, "Room created", a.cfg.MaxTextsPerRoom)
 
 		baseURL := a.baseURL(r)
 		resp := map[string]any{
@@ -803,6 +855,8 @@ func (a *App) routes() (http.Handler, error) {
 			MaxAge:   maxAge,
 		})
 
+		_, _ = a.texts.CreateServerText(r.Context(), rm.ID, "Client connected", a.cfg.MaxTextsPerRoom)
+
 		if !strings.HasPrefix(contentType, "application/json") && strings.Contains(r.Header.Get("Accept"), "text/html") {
 			http.Redirect(w, r, "/r/"+token, http.StatusSeeOther)
 			return
@@ -922,6 +976,7 @@ func (a *App) routes() (http.Handler, error) {
 		}
 
 		if role == room.RoleCreator {
+			_, _ = a.texts.CreateServerText(r.Context(), rm.ID, "Room closed", a.cfg.MaxTextsPerRoom)
 			err = a.rooms.CloseByRoomID(r.Context(), rm.ID)
 			if err != nil && !errors.Is(err, room.ErrRoomClosed) {
 				writeJSONError(w, "failed to close room", http.StatusInternalServerError)
@@ -949,6 +1004,8 @@ func (a *App) routes() (http.Handler, error) {
 			writeJSONError(w, "failed to close room", http.StatusInternalServerError)
 			return
 		}
+
+		_, _ = a.texts.CreateServerText(r.Context(), rm.ID, "Room is closing", a.cfg.MaxTextsPerRoom)
 
 		var closeDeadlineStr string
 		if closingRoom.CloseDeadline != nil {
@@ -1110,6 +1167,8 @@ func (a *App) routes() (http.Handler, error) {
 					return
 				}
 
+				_, _ = a.texts.CreateServerText(r.Context(), rm.ID, fmt.Sprintf("File uploaded: %s", uploaded.OriginalFilename), a.cfg.MaxTextsPerRoom)
+
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusCreated)
 				_ = json.NewEncoder(w).Encode(uploaded)
@@ -1263,6 +1322,182 @@ func (a *App) routes() (http.Handler, error) {
 
 	mux.HandleFunc("GET /api/v1/rooms/{token}/files/{file_id}", downloadHandler)
 	mux.HandleFunc("HEAD /api/v1/rooms/{token}/files/{file_id}", downloadHandler)
+
+	// Text Sharing Endpoints (PIN protected for participants)
+	mux.HandleFunc("POST /api/v1/rooms/{token}/texts", func(w http.ResponseWriter, r *http.Request) {
+		if !a.checkRateLimit(w, r, a.textLimiter) {
+			return
+		}
+
+		token := r.PathValue("token")
+		rm, role, err := a.rooms.GetByToken(r.Context(), token)
+		if err != nil {
+			if errors.Is(err, room.ErrRoomNotFound) {
+				writeJSONError(w, "room not found", http.StatusNotFound)
+				return
+			}
+			if errors.Is(err, room.ErrRoomExpired) {
+				writeJSONError(w, "room has expired", http.StatusGone)
+				return
+			}
+			if errors.Is(err, room.ErrRoomClosed) {
+				writeJSONError(w, "room is closed", http.StatusGone)
+				return
+			}
+			writeJSONError(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if rm.Status == "closing" {
+			writeJSONError(w, "room is closing; text messages are no longer accepted", http.StatusConflict)
+			return
+		}
+
+		if role == room.RoleParticipant && rm.PinRequired {
+			if !a.isParticipantAuthenticated(r.Context(), rm, r) {
+				writeJSONError(w, "PIN authentication required", http.StatusUnauthorized)
+				return
+			}
+		}
+
+		a.trackParticipantFromRequest(r, rm, role)
+
+		r.Body = http.MaxBytesReader(w, r.Body, a.cfg.MaxTextSize+4096)
+
+		var req struct {
+			Content         string `json:"content"`
+			SenderSessionID string `json:"sender_session_id"`
+			ClientSessionID string `json:"client_session_id"`
+		}
+
+		contentType := r.Header.Get("Content-Type")
+		if strings.HasPrefix(contentType, "application/json") {
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				var maxBytesErr *http.MaxBytesError
+				if errors.As(err, &maxBytesErr) {
+					writeJSONError(w, "text exceeds maximum permitted size", http.StatusRequestEntityTooLarge)
+					return
+				}
+				writeJSONError(w, "invalid request payload", http.StatusBadRequest)
+				return
+			}
+		} else {
+			if err := r.ParseForm(); err != nil {
+				var maxBytesErr *http.MaxBytesError
+				if errors.As(err, &maxBytesErr) {
+					writeJSONError(w, "text exceeds maximum permitted size", http.StatusRequestEntityTooLarge)
+					return
+				}
+			}
+			req.Content = r.FormValue("content")
+			req.SenderSessionID = r.FormValue("sender_session_id")
+		}
+
+		if strings.TrimSpace(req.Content) == "" {
+			writeJSONError(w, "text content cannot be empty", http.StatusBadRequest)
+			return
+		}
+
+		clientSessionID := a.getClientSessionID(r, rm.ID)
+		if clientSessionID == "" {
+			if req.ClientSessionID != "" {
+				clientSessionID = req.ClientSessionID
+			} else if req.SenderSessionID != "" {
+				clientSessionID = req.SenderSessionID
+			} else {
+				clientSessionID = generateEphemeralSessionID()
+			}
+		}
+
+		created, err := a.texts.CreateClientText(r.Context(), rm.ID, clientSessionID, req.Content, a.cfg.MaxTextSize, a.cfg.MaxTextsPerRoom)
+		if err != nil {
+			if errors.Is(err, text.ErrTextEmpty) {
+				writeJSONError(w, "text content cannot be empty", http.StatusBadRequest)
+				return
+			}
+			if errors.Is(err, text.ErrTextTooLarge) {
+				writeJSONError(w, "text exceeds maximum permitted size", http.StatusRequestEntityTooLarge)
+				return
+			}
+			if errors.Is(err, text.ErrTextLimitReached) {
+				writeJSONError(w, "room text message limit reached", http.StatusBadRequest)
+				return
+			}
+			if errors.Is(err, text.ErrRoomInactive) {
+				writeJSONError(w, "room is inactive", http.StatusGone)
+				return
+			}
+			a.logger.Error("failed to create text message", "error", err)
+			writeJSONError(w, "failed to save text message", http.StatusInternalServerError)
+			return
+		}
+
+		created.IsSelf = true
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(created)
+	})
+
+	mux.HandleFunc("GET /api/v1/rooms/{token}/texts", func(w http.ResponseWriter, r *http.Request) {
+		token := r.PathValue("token")
+		rm, role, err := a.rooms.GetByToken(r.Context(), token)
+		if err != nil {
+			if errors.Is(err, room.ErrRoomNotFound) {
+				writeJSONError(w, "room not found", http.StatusNotFound)
+				return
+			}
+			if errors.Is(err, room.ErrRoomExpired) {
+				writeJSONError(w, "room has expired", http.StatusGone)
+				return
+			}
+			if errors.Is(err, room.ErrRoomClosed) {
+				writeJSONError(w, "room is closed", http.StatusGone)
+				return
+			}
+			writeJSONError(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if role == room.RoleParticipant && rm.PinRequired {
+			if !a.isParticipantAuthenticated(r.Context(), rm, r) {
+				writeJSONError(w, "PIN authentication required", http.StatusUnauthorized)
+				return
+			}
+		}
+
+		a.trackParticipantFromRequest(r, rm, role)
+
+		textsList, err := a.texts.ListRoomTexts(r.Context(), rm.ID)
+		if err != nil {
+			a.logger.Error("failed to list texts", "error", err)
+			writeJSONError(w, "failed to list text messages", http.StatusInternalServerError)
+			return
+		}
+
+		if textsList == nil {
+			textsList = []text.Text{}
+		}
+
+		reqSessionID := a.getClientSessionID(r, rm.ID)
+		for i := range textsList {
+			if textsList[i].SenderType == "client" && textsList[i].SenderSessionID != nil && reqSessionID != "" {
+				textsList[i].IsSelf = (*textsList[i].SenderSessionID == reqSessionID)
+			}
+		}
+
+		resp := map[string]any{
+			"room_id":       rm.ID,
+			"status":        rm.Status,
+			"texts":         textsList,
+			"text_count":    len(textsList),
+			"total":         len(textsList),
+			"max_text_size": a.cfg.MaxTextSize,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	})
 
 	// Global Share endpoints (creator management & public download capability)
 	mux.HandleFunc("POST /api/v1/rooms/{token}/files/{file_id}/share", func(w http.ResponseWriter, r *http.Request) {

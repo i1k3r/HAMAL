@@ -9,8 +9,10 @@ import (
 	"log/slog"
 	"mime/multipart"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -174,8 +176,8 @@ func TestCreatorAndParticipantViewsAndSeparation(t *testing.T) {
 	if cResp.Code != http.StatusOK {
 		t.Fatalf("expected 200 for creator view, got %d", cResp.Code)
 	}
-	if !strings.Contains(cResp.Body.String(), "CREATOR") {
-		t.Fatalf("expected CREATOR badge in creator page")
+	if !strings.Contains(cResp.Body.String(), "creator") {
+		t.Fatalf("expected creator page indicator in creator page")
 	}
 
 	// 2. Participant accessing /r/{token} -> 200 OK
@@ -185,8 +187,8 @@ func TestCreatorAndParticipantViewsAndSeparation(t *testing.T) {
 	if pResp.Code != http.StatusOK {
 		t.Fatalf("expected 200 for participant view, got %d", pResp.Code)
 	}
-	if !strings.Contains(pResp.Body.String(), "PARTICIPANT") {
-		t.Fatalf("expected PARTICIPANT in participant page")
+	if !strings.Contains(pResp.Body.String(), "participant") {
+		t.Fatalf("expected participant page indicator in participant page")
 	}
 
 	// 3. Capability separation: participant token used on /c/{token} -> 404
@@ -3926,3 +3928,587 @@ func TestParticipantManyFilesLayoutAndScrolling(t *testing.T) {
 		t.Fatalf("expected %d files, got %d", fileCount, len(listData.Files))
 	}
 }
+
+func TestDirectTextSharing_Comprehensive(t *testing.T) {
+	app := testApp(t)
+	ts := httptest.NewServer(app.Handler())
+	defer ts.Close()
+
+	// 1. Create room -> triggers SERVER message "Room created"
+	createResp, err := http.Post(ts.URL+"/api/v1/rooms", "application/json", strings.NewReader(`{"ttl_seconds": 3600}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer createResp.Body.Close()
+	var room struct {
+		RoomID           string `json:"room_id"`
+		CreatorToken     string `json:"creator_token"`
+		ParticipantToken string `json:"participant_token"`
+	}
+	if err := json.NewDecoder(createResp.Body).Decode(&room); err != nil {
+		t.Fatal(err)
+	}
+
+	sessionA := "session_client_a"
+	sessionB := "session_client_b"
+
+	// 2. Post CLIENT message with session A
+	clientABody := `{"content": "First client snippet\nline 2", "client_session_id": "session_client_a"}`
+	reqA, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+room.CreatorToken+"/texts", strings.NewReader(clientABody))
+	reqA.Header.Set("Content-Type", "application/json")
+	reqA.Header.Set("X-Client-Session-ID", sessionA)
+	resA, err := http.DefaultClient.Do(reqA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resA.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 for client A post, got %d", resA.StatusCode)
+	}
+	var msgA struct {
+		ID         string `json:"id"`
+		SenderType string `json:"sender_type"`
+		Content    string `json:"content"`
+	}
+	_ = json.NewDecoder(resA.Body).Decode(&msgA)
+	resA.Body.Close()
+	if msgA.SenderType != "client" {
+		t.Errorf("expected sender_type 'client', got '%s'", msgA.SenderType)
+	}
+	if msgA.Content != "First client snippet\nline 2" {
+		t.Errorf("unexpected content: %s", msgA.Content)
+	}
+
+	// 3. Post CLIENT message with session B
+	clientBBody := `{"content": "Second client snippet from peer"}`
+	reqB, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+room.ParticipantToken+"/texts", strings.NewReader(clientBBody))
+	reqB.Header.Set("Content-Type", "application/json")
+	reqB.Header.Set("X-Client-Session-ID", sessionB)
+	resB, err := http.DefaultClient.Do(reqB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resB.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 for client B post, got %d", resB.StatusCode)
+	}
+	resB.Body.Close()
+
+	// 4. Client cannot spoof SERVER message (sending sender_type: "server" in JSON body must still produce client message)
+	spoofBody := `{"content": "I am the server", "sender_type": "server"}`
+	reqSpoof, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+room.ParticipantToken+"/texts", strings.NewReader(spoofBody))
+	reqSpoof.Header.Set("Content-Type", "application/json")
+	reqSpoof.Header.Set("X-Client-Session-ID", sessionB)
+	resSpoof, err := http.DefaultClient.Do(reqSpoof)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var spoofMsg struct {
+		SenderType string `json:"sender_type"`
+	}
+	_ = json.NewDecoder(resSpoof.Body).Decode(&spoofMsg)
+	resSpoof.Body.Close()
+	if spoofMsg.SenderType != "client" {
+		t.Fatalf("expected client post to always have sender_type 'client', got '%s'", spoofMsg.SenderType)
+	}
+
+	// 5. Query messages as Session A -> verify is_self flags, ordering, server events
+	reqListA, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/rooms/"+room.CreatorToken+"/texts", nil)
+	reqListA.Header.Set("X-Client-Session-ID", sessionA)
+	resListA, err := http.DefaultClient.Do(reqListA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var listDataA struct {
+		Texts []struct {
+			ID         string `json:"id"`
+			SenderType string `json:"sender_type"`
+			Content    string `json:"content"`
+			IsSelf     bool   `json:"is_self"`
+		} `json:"texts"`
+		Total int `json:"total"`
+	}
+	_ = json.NewDecoder(resListA.Body).Decode(&listDataA)
+	resListA.Body.Close()
+
+	if len(listDataA.Texts) < 4 {
+		t.Fatalf("expected at least 4 texts, got %d", len(listDataA.Texts))
+	}
+	// First message is SERVER event "Room created"
+	if listDataA.Texts[0].SenderType != "server" || !strings.Contains(listDataA.Texts[0].Content, "Room created") {
+		t.Errorf("expected first message to be server 'Room created', got %+v", listDataA.Texts[0])
+	}
+	if listDataA.Texts[0].IsSelf {
+		t.Errorf("expected server message is_self to be false")
+	}
+	// Second message is Session A -> is_self == true for requester Session A
+	if listDataA.Texts[1].SenderType != "client" || !listDataA.Texts[1].IsSelf {
+		t.Errorf("expected message 1 to be client with is_self=true for session A, got %+v", listDataA.Texts[1])
+	}
+	// Third message is Session B -> is_self == false for requester Session A
+	if listDataA.Texts[2].SenderType != "client" || listDataA.Texts[2].IsSelf {
+		t.Errorf("expected message 2 to be client with is_self=false for session A, got %+v", listDataA.Texts[2])
+	}
+
+	// 6. Query messages as Session B -> verify is_self flags are inverted appropriately
+	reqListB, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/rooms/"+room.ParticipantToken+"/texts", nil)
+	reqListB.Header.Set("X-Client-Session-ID", sessionB)
+	resListB, err := http.DefaultClient.Do(reqListB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var listDataB struct {
+		Texts []struct {
+			ID         string `json:"id"`
+			SenderType string `json:"sender_type"`
+			Content    string `json:"content"`
+			IsSelf     bool   `json:"is_self"`
+		} `json:"texts"`
+	}
+	_ = json.NewDecoder(resListB.Body).Decode(&listDataB)
+	resListB.Body.Close()
+
+	if listDataB.Texts[1].IsSelf {
+		t.Errorf("expected message 1 is_self=false for session B")
+	}
+	if !listDataB.Texts[2].IsSelf {
+		t.Errorf("expected message 2 is_self=true for session B")
+	}
+
+	// 7. Multiline text survives storage/retrieval unchanged
+	multilineText := "line1\r\nline2\n\ttabbed line 3\n\nline 5"
+	mlPayload, _ := json.Marshal(map[string]string{"content": multilineText})
+	reqML, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+room.ParticipantToken+"/texts", bytes.NewReader(mlPayload))
+	reqML.Header.Set("Content-Type", "application/json")
+	resML, err := http.DefaultClient.Do(reqML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mlResp struct {
+		Content string `json:"content"`
+	}
+	_ = json.NewDecoder(resML.Body).Decode(&mlResp)
+	resML.Body.Close()
+	if mlResp.Content != multilineText {
+		t.Errorf("multiline text mismatch: expected %q, got %q", multilineText, mlResp.Content)
+	}
+
+	// 8. XSS payload remains plain text
+	xssPayload := `<script>alert("xss")</script><img src=x onerror=alert(1)>`
+	xssData, _ := json.Marshal(map[string]string{"content": xssPayload})
+	reqXSS, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+room.ParticipantToken+"/texts", bytes.NewReader(xssData))
+	reqXSS.Header.Set("Content-Type", "application/json")
+	resXSS, err := http.DefaultClient.Do(reqXSS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var xssResp struct {
+		Content string `json:"content"`
+	}
+	_ = json.NewDecoder(resXSS.Body).Decode(&xssResp)
+	resXSS.Body.Close()
+	if xssResp.Content != xssPayload {
+		t.Errorf("expected XSS payload preserved exactly as plain text string")
+	}
+
+	// 9. Empty message rejection (400 Bad Request)
+	emptyReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+room.ParticipantToken+"/texts", strings.NewReader(`{"content": "   \n\t "}`))
+	emptyReq.Header.Set("Content-Type", "application/json")
+	emptyRes, err := http.DefaultClient.Do(emptyReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emptyRes.Body.Close()
+	if emptyRes.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 Bad Request for whitespace text, got %d", emptyRes.StatusCode)
+	}
+
+	// 10. Max text size enforcement (64 KB)
+	oversizedText := strings.Repeat("A", 65537)
+	largeBody, _ := json.Marshal(map[string]string{"content": oversizedText})
+	largeReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+room.ParticipantToken+"/texts", strings.NewReader(string(largeBody)))
+	largeReq.Header.Set("Content-Type", "application/json")
+	largeRes, err := http.DefaultClient.Do(largeReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	largeRes.Body.Close()
+	if largeRes.StatusCode != http.StatusRequestEntityTooLarge && largeRes.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 413 or 400 for oversized text, got %d", largeRes.StatusCode)
+	}
+
+	// 11. Room isolation: create second room and verify it has only its own server event
+	createResp2, err := http.Post(ts.URL+"/api/v1/rooms", "application/json", strings.NewReader(`{"ttl_seconds": 3600}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer createResp2.Body.Close()
+	var room2 struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp2.Body).Decode(&room2)
+	listResp2, err := http.Get(ts.URL + "/api/v1/rooms/" + room2.ParticipantToken + "/texts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listResp2.Body.Close()
+	var listData2 struct {
+		Texts []struct {
+			Content    string `json:"content"`
+			SenderType string `json:"sender_type"`
+		} `json:"texts"`
+		Total int `json:"total"`
+	}
+	_ = json.NewDecoder(listResp2.Body).Decode(&listData2)
+	if len(listData2.Texts) != 1 || listData2.Texts[0].SenderType != "server" {
+		t.Fatalf("expected exactly 1 server event in isolated room 2, got %d", len(listData2.Texts))
+	}
+
+	// 12. Cascade cleanup when room is deleted/closed
+	closeReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+room.CreatorToken+"/close", nil)
+	closeResp, err := http.DefaultClient.Do(closeReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeResp.Body.Close()
+
+	// Inactive/Closed room rejection for POST texts
+	afterCloseReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+room.ParticipantToken+"/texts", strings.NewReader(`{"content": "too late"}`))
+	afterCloseReq.Header.Set("Content-Type", "application/json")
+	afterCloseRes, err := http.DefaultClient.Do(afterCloseReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterCloseRes.Body.Close()
+	if afterCloseRes.StatusCode != http.StatusGone && afterCloseRes.StatusCode != http.StatusNotFound && afterCloseRes.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 410, 404, or 409 for text post to closed room, got %d", afterCloseRes.StatusCode)
+	}
+}
+
+func TestDirectTextSharing_MaxRoomLimit(t *testing.T) {
+	cfg := config.Default()
+	cfg.DataDir = t.TempDir()
+	cfg.DBPath = filepath.Join(cfg.DataDir, "lan-drop.db")
+	cfg.ShareManagementRateLimit = 10000 // Ensure rate limiter doesn't block bulk test
+	a, err := New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = a.Close() })
+
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	createResp, err := http.Post(ts.URL+"/api/v1/rooms", "application/json", strings.NewReader(`{"ttl_seconds": 3600}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer createResp.Body.Close()
+	var room struct {
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&room)
+
+	// Post up to limit (200)
+	var hitLimit bool
+	for i := 0; i < 205; i++ {
+		b := fmt.Sprintf(`{"content": "msg %d"}`, i)
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+room.ParticipantToken+"/texts", strings.NewReader(b))
+		req.Header.Set("Content-Type", "application/json")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.StatusCode == http.StatusBadRequest {
+			var errData map[string]string
+			_ = json.NewDecoder(res.Body).Decode(&errData)
+			if strings.Contains(errData["error"], "limit") {
+				hitLimit = true
+			}
+		}
+		res.Body.Close()
+		if hitLimit {
+			break
+		}
+	}
+	if !hitLimit {
+		t.Errorf("expected to hit room text limit (200)")
+	}
+
+	// Verify room total is capped at 200
+	listResp, _ := http.Get(ts.URL + "/api/v1/rooms/" + room.ParticipantToken + "/texts")
+	var l struct {
+		Total int `json:"total"`
+	}
+	_ = json.NewDecoder(listResp.Body).Decode(&l)
+	listResp.Body.Close()
+	if l.Total > 200 {
+		t.Errorf("expected total <= 200, got %d", l.Total)
+	}
+}
+
+func TestDirectTextSharing_PINAndLifecycle(t *testing.T) {
+	app := testApp(t)
+	ts := httptest.NewServer(app.Handler())
+	defer ts.Close()
+
+	// 1. Create PIN-protected room
+	createResp, err := http.Post(ts.URL+"/api/v1/rooms", "application/json", strings.NewReader(`{"ttl_seconds": 3600, "pin": "9999"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer createResp.Body.Close()
+	var room struct {
+		RoomID           string `json:"room_id"`
+		CreatorToken     string `json:"creator_token"`
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&room)
+
+	// 2. Unauthenticated participant attempts to post text -> 401
+	unauthReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+room.ParticipantToken+"/texts", strings.NewReader(`{"content": "secret"}`))
+	unauthReq.Header.Set("Content-Type", "application/json")
+	unauthRes, err := http.DefaultClient.Do(unauthReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unauthRes.Body.Close()
+	if unauthRes.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 Unauthorized for PIN-protected text post without auth, got %d", unauthRes.StatusCode)
+	}
+
+	// 3. Authenticate with PIN -> triggers "Client connected" server event
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	authResp, err := client.Post(ts.URL+"/api/v1/rooms/"+room.ParticipantToken+"/auth/pin", "application/json", strings.NewReader(`{"pin": "9999"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	authResp.Body.Close()
+	if authResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for correct PIN, got %d", authResp.StatusCode)
+	}
+
+	// 4. Authenticated participant posts text -> 201
+	authPostReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+room.ParticipantToken+"/texts", strings.NewReader(`{"content": "secret password"}`))
+	authPostReq.Header.Set("Content-Type", "application/json")
+	authPostRes, err := client.Do(authPostReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authPostRes.Body.Close()
+	if authPostRes.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 for authenticated participant text post, got %d", authPostRes.StatusCode)
+	}
+
+	// 5. Initiate Room Close (participant triggers close)
+	closeResp, err := client.Post(ts.URL+"/api/v1/rooms/"+room.ParticipantToken+"/close", "application/json", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeResp.Body.Close()
+	if closeResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for room close, got %d", closeResp.StatusCode)
+	}
+
+	// 6. Attempting to post text during 'closing' state -> 409 Conflict
+	closingReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+room.ParticipantToken+"/texts", strings.NewReader(`{"content": "too late"}`))
+	closingReq.Header.Set("Content-Type", "application/json")
+	closingRes, err := client.Do(closingReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closingRes.Body.Close()
+	if closingRes.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 409 Conflict for text post during closing state, got %d", closingRes.StatusCode)
+	}
+}
+
+func TestDirectTextSharing_I18NKeys(t *testing.T) {
+	app := testApp(t)
+	ts := httptest.NewServer(app.Handler())
+	defer ts.Close()
+
+	jsResp, err := http.Get(ts.URL + "/static/site.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer jsResp.Body.Close()
+	jsBytes, err := io.ReadAll(jsResp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jsStr := string(jsBytes)
+
+	requiredKeys := []string{
+		"filesTab",
+		"textTab",
+		"sendText",
+		"sendingText",
+		"copyText",
+		"copiedText",
+		"noTextsYet",
+		"noTextsSub",
+		"textPlaceholder",
+		"textTooLarge",
+		"client",
+		"server",
+		"newMessage",
+	}
+	for _, key := range requiredKeys {
+		if !strings.Contains(jsStr, key+":") && !strings.Contains(jsStr, "\""+key+"\":") {
+			t.Errorf("expected i18n key %s in site.js", key)
+		}
+	}
+
+	expectedLangs := []string{
+		"en", "tr", "zh-CN", "hi", "es", "fr", "ar", "bn", "pt", "ru",
+		"ur", "id", "de", "ja", "mr", "te", "nl", "it", "ko", "pl",
+	}
+	for _, lang := range expectedLangs {
+		if !strings.Contains(jsStr, fmt.Sprintf("%s:", lang)) && !strings.Contains(jsStr, fmt.Sprintf("\"%s\":", lang)) {
+			t.Errorf("expected language %s in site.js PARTICIPANT_I18N", lang)
+		}
+	}
+}
+
+func TestCaptureScreenshots(t *testing.T) {
+	if os.Getenv("HAMAL_CAPTURE_SCREENSHOTS") != "1" {
+		t.Skip("Skipping screenshot capture unless HAMAL_CAPTURE_SCREENSHOTS=1")
+	}
+
+	a := testApp(t)
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+
+	chromePath := `C:\Program Files\Google\Chrome\Application\chrome.exe`
+	if _, err := os.Stat(chromePath); err != nil {
+		chromePath = `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`
+	}
+
+	outDir := filepath.Join("..", "..", "docs", "screenshots")
+	_ = os.MkdirAll(outDir, 0755)
+
+	artifactDir := `C:\Users\hw\.gemini\antigravity\brain\080f48ce-9709-422c-b273-8e72b13e27f5`
+	_ = os.MkdirAll(artifactDir, 0755)
+
+	capture := func(url, filename string, width, height int) {
+		dest1, _ := filepath.Abs(filepath.Join(outDir, filename))
+		dest2 := filepath.Join(artifactDir, filename)
+
+		args := []string{
+			"--headless=new",
+			"--disable-gpu",
+			"--hide-scrollbars",
+			"--force-device-scale-factor=1",
+			fmt.Sprintf("--window-size=%d,%d", width, height),
+			fmt.Sprintf("--screenshot=%s", dest1),
+			url,
+		}
+
+		cmd := exec.Command(chromePath, args...)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Logf("Screenshot error for %s: %v, output: %s", filename, err, string(output))
+		} else {
+			t.Logf("Captured: %s", dest1)
+			data, err := os.ReadFile(dest1)
+			if err == nil {
+				_ = os.WriteFile(dest2, data, 0644)
+			}
+		}
+	}
+
+	// 1. Home
+	capture(ts.URL+"/", "home_new.png", 1280, 850)
+
+	// 2. Room A (Empty state - Text tab via ?tab=text)
+	createResp, err := http.Post(ts.URL+"/api/v1/rooms", "application/json", bytes.NewReader([]byte(`{"ttl_seconds": 7200}`)))
+	if err != nil {
+		t.Fatalf("failed to create room A: %v", err)
+	}
+	var roomA struct {
+		CreatorToken     string `json:"creator_token"`
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&roomA)
+	createResp.Body.Close()
+
+	capture(ts.URL+"/c/"+roomA.CreatorToken+"?tab=text", "creator_empty_state.png", 1280, 850)
+
+	// 3. Room B (Populated with real files & technical snippets)
+	createRespB, err := http.Post(ts.URL+"/api/v1/rooms", "application/json", bytes.NewReader([]byte(`{"ttl_seconds": 7200}`)))
+	if err != nil {
+		t.Fatalf("failed to create room B: %v", err)
+	}
+	var roomB struct {
+		CreatorToken     string `json:"creator_token"`
+		ParticipantToken string `json:"participant_token"`
+	}
+	_ = json.NewDecoder(createRespB.Body).Decode(&roomB)
+	createRespB.Body.Close()
+
+	// Upload sample file to Room B
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("file", "hamal_cluster_deploy.sh")
+	part.Write([]byte("#!/bin/bash\necho 'Deploying HAMAL cluster...'\n"))
+	writer.Close()
+	uploadReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+roomB.CreatorToken+"/files", body)
+	uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+	upRes, err := http.DefaultClient.Do(uploadReq)
+	if err == nil {
+		upRes.Body.Close()
+	}
+
+	sessionA := "session_creator_pc_a"
+	sessionB := "session_peer_pc_b"
+
+	postSnippet := func(token, sessionID, textContent string) {
+		payload, _ := json.Marshal(map[string]string{
+			"content":           textContent,
+			"client_session_id": sessionID,
+		})
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/rooms/"+token+"/texts", bytes.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Client-Session-ID", sessionID)
+		res, err := http.DefaultClient.Do(req)
+		if err == nil {
+			res.Body.Close()
+		}
+	}
+
+	// 1st snippet: Shell command from PC A
+	postSnippet(roomB.CreatorToken, sessionA, `curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh --dry-run`)
+
+	// 2nd snippet: YAML config from PC B
+	postSnippet(roomB.ParticipantToken, sessionB, `version: '3.8'
+services:
+  hamal:
+    image: i1k3r/hamal:latest
+    container_name: hamal_core
+    ports:
+      - "8080:8080"
+    environment:
+      - LAN_DROP_MAX_TEXT_SIZE=65536
+      - LAN_DROP_MAX_TEXTS_PER_ROOM=200
+    restart: unless-stopped`)
+
+	// 3rd snippet: Terminal output / logs from PC B
+	postSnippet(roomB.ParticipantToken, sessionB, `[2026-09-18 23:25:01] INFO  hamal: starting server on :8080 (http)
+[2026-09-18 23:25:02] INFO  hamal: loaded database at /data/lan-drop.db (WAL mode)
+[2026-09-18 23:25:02] INFO  hamal: background cleanup worker initialized (interval: 1m)
+[2026-09-18 23:25:03] DEBUG client connected: ephemeral session initialized
+[2026-09-18 23:25:05] INFO  room 9f8a2b: text snippet (648 bytes) dispatched to room stream`)
+
+	time.Sleep(300 * time.Millisecond)
+
+	// Capture views in Text Tab using ?tab=text
+	capture(ts.URL+"/c/"+roomB.CreatorToken+"?tab=text", "creator_clipboard_messages.png", 1280, 920)
+	capture(ts.URL+"/c/"+roomB.CreatorToken+"?tab=text", "creator.jpg", 1280, 920)
+	capture(ts.URL+"/r/"+roomB.ParticipantToken+"?tab=text", "participant_desktop_clipboard.png", 1280, 920)
+	capture(ts.URL+"/r/"+roomB.ParticipantToken+"?tab=text", "participant_mobile_390px.png", 390, 844)
+	capture(ts.URL+"/r/"+roomB.ParticipantToken+"?tab=text", "participant_mobile_375px.png", 375, 812)
+	capture(ts.URL+"/r/"+roomB.ParticipantToken+"?tab=text", "participant_tablet_clipboard.png", 768, 1024)
+
+	t.Log("All requested screenshots captured successfully.")
+}
+

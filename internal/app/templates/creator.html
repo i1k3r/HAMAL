@@ -7,7 +7,7 @@
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#0B0D0F" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#F7F8FA" media="(prefers-color-scheme: light)">
-  <title>HAMAL · CREATOR DISPATCH</title>
+  <title>HAMAL · Transfer Room</title>
   <link rel="icon" type="image/svg+xml" href="/static/brand/hamal-app-icon.svg">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/static/brand/hamal-app-icon.svg">
@@ -46,6 +46,11 @@
             <span>Files</span>
             <span id="nav-file-count" class="nav-pill">{{len .Files}}</span>
           </button>
+          <button type="button" id="nav-btn-texts" class="nav-item">
+            <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            <span>Text</span>
+            <span id="nav-text-count" class="nav-pill">{{len .Texts}}</span>
+          </button>
           <button type="button" id="nav-btn-about" class="nav-item">
             <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
             <span>About</span>
@@ -68,7 +73,7 @@
               <svg width="14" height="14" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
             </button>
           </div>
-          <span id="sidebar-version" class="version-text">v0.8.4</span>
+          <span id="sidebar-version" class="version-text">v0.8.9</span>
         </div>
       </div>
     </aside>
@@ -141,8 +146,22 @@
                 </div>
               </div>
 
-              <!-- Dropzone Upload Panel (Fills remaining vertical space) -->
-              <div id="dropzone" class="dropzone-panel">
+              <!-- Left Panel Sharing Mode Tabs -->
+              <div class="creator-mode-tabs-wrap" role="tablist" aria-label="Sharing Mode">
+                <button type="button" id="tab-files" class="creator-tab-btn active" role="tab" aria-selected="true" aria-controls="dropzone">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                  <span id="tab-files-label">Files</span>
+                  <span id="tab-files-badge" class="mode-pill">{{len .Files}}</span>
+                </button>
+                <button type="button" id="tab-text" class="creator-tab-btn" role="tab" aria-selected="false" aria-controls="creator-text-compose">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                  <span id="tab-text-label">Text</span>
+                  <span id="tab-text-badge" class="mode-pill">{{len .Texts}}</span>
+                </button>
+              </div>
+
+              <!-- Dropzone Upload Panel (Files Mode) -->
+              <div id="dropzone" class="dropzone-panel sharing-mode-panel active">
                 <div class="dropzone-icon" id="dropzone-icon">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                 </div>
@@ -161,10 +180,31 @@
                   <div id="upload-error" class="form-hint" style="color: var(--accent-danger); display: none;"></div>
                 </div>
               </div>
+
+              <!-- Text Compose Panel (Text Mode) -->
+              <div id="creator-text-compose" class="creator-text-panel sharing-mode-panel" style="display: none;">
+                <div class="text-compose-header">
+                  <span id="text-compose-label" class="text-compose-title font-sans">SEND TEXT OR LINK</span>
+                  <span id="text-size-counter" class="text-counter font-mono">0 / 64 KB</span>
+                </div>
+                <div class="text-input-wrap">
+                  <textarea id="text-input" class="text-textarea font-sans" placeholder="Type or paste text, URLs, or notes here…" maxlength="65536" rows="4" aria-label="Text message content"></textarea>
+                </div>
+                <div class="text-compose-actions">
+                  <span id="text-compose-error" class="text-error-hint" style="display: none;"></span>
+                  <button type="button" id="send-text-btn" class="btn btn-primary btn-send-text">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                    <span id="send-text-label">Send Text</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- Right Column: 3 Separate Card Islands (Participants, Activity, Files) -->
+          <!-- Right Column: 3 Separate Card Islands (Participants, Activity, Files / Texts) -->
           <div class="column-right">
             <!-- 1. Connected Participants Card -->
             <section class="section-group">
@@ -193,7 +233,7 @@
             </section>
 
             <!-- 3. Files in Room Card -->
-            <section class="section-group">
+            <section id="creator-files-section" class="section-group sharing-mode-feed active">
               <div class="section-header">
                 <span class="section-title">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
@@ -228,6 +268,41 @@
                   <div id="no-files-msg" class="empty-state-box">
                     <p class="empty-state-title">Nothing here yet.</p>
                     <p class="empty-state-lead">Waiting for files. Drag files above or send parcels from your phone.</p>
+                  </div>
+                {{end}}
+              </div>
+            </section>
+
+            <!-- 4. Text Messages in Room Card -->
+            <section id="creator-texts-section" class="section-group sharing-mode-feed" style="display: none;">
+              <div class="section-header">
+                <span class="section-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                  <span>TEXT MESSAGES</span> (<span id="text-count">{{len .Texts}}</span>)
+                </span>
+              </div>
+              <div id="text-list" class="text-list-container">
+                {{if .Texts}}
+                  {{range .Texts}}
+                  <div class="text-item-card sender-{{.SenderType}}" data-text-id="{{.ID}}">
+                    <div class="text-item-header">
+                      <div class="text-sender-tag {{.SenderType}}">
+                        <span class="sender-role font-mono">{{if eq .SenderType "server"}}SERVER{{else}}CLIENT{{end}}</span>
+                      </div>
+                      {{if ne .SenderType "server"}}
+                      <button type="button" class="btn-copy-text" title="Copy" aria-label="Copy message text">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        <span class="copy-label">Copy</span>
+                      </button>
+                      {{end}}
+                    </div>
+                    <div class="text-item-content font-mono">{{.Content}}</div>
+                  </div>
+                  {{end}}
+                {{else}}
+                  <div id="no-texts-msg" class="empty-state-box">
+                    <p class="empty-state-title" id="no-texts-title">No text messages yet.</p>
+                    <p class="empty-state-lead" id="no-texts-desc">Paste commands, logs, snippets, or URLs to share directly.</p>
                   </div>
                 {{end}}
               </div>
@@ -279,7 +354,7 @@
       <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span class="font-mono" style="font-size: 12px; color: var(--accent-amber);">FAST · PRIVATE · TEMPORARY · LOCAL</span>
-          <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">v0.8.4</span>
+          <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">v0.8.9</span>
         </div>
         <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
           HAMAL is a quiet, precise digital courier designed to move files point-to-point on your local network without cloud storage, accounts, or telemetry.

@@ -209,6 +209,39 @@ func Migrate(db *sql.DB) error {
 			return fmt.Errorf("commit migration 6: %w", err)
 		}
 	}
+
+	var v7Applied int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version = 7;`).Scan(&v7Applied); err != nil {
+		return fmt.Errorf("check migration 7: %w", err)
+	}
+	if v7Applied == 0 {
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("begin migration 7: %w", err)
+		}
+		defer tx.Rollback()
+		schema := `
+			CREATE TABLE IF NOT EXISTS texts (
+				id TEXT PRIMARY KEY,
+				room_id TEXT NOT NULL,
+				sender_type TEXT NOT NULL DEFAULT 'client',
+				sender_session_id TEXT NULL,
+				content TEXT NOT NULL,
+				size_bytes INTEGER NOT NULL,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+				FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+			);
+			CREATE INDEX IF NOT EXISTS idx_texts_room_id ON texts (room_id);
+			CREATE INDEX IF NOT EXISTS idx_texts_created_at ON texts (created_at);
+			INSERT INTO schema_migrations (version) VALUES (7);
+		`
+		if _, err := tx.Exec(schema); err != nil {
+			return fmt.Errorf("execute migration 7: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit migration 7: %w", err)
+		}
+	}
 	return nil
 }
 

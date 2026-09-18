@@ -221,7 +221,7 @@
       return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
 
-    // 20 Languages Translation Map for Participant & Executable Warnings
+    // 20 Languages Translation Map for Participant & Executable Warnings & Text Sharing
     const PARTICIPANT_I18N = {
       en: {
         executableWarning: "Potentially executable file. Only open or install files you trust.",
@@ -237,7 +237,20 @@
         networkError: "Network error while closing room",
         roomClosing: "ROOM CLOSING",
         closingDesc: "This transfer room will close automatically in",
-        seconds: "seconds"
+        seconds: "seconds",
+        filesTab: "Files",
+        textTab: "Text",
+        sendText: "Send",
+        sendingText: "Sending…",
+        copyText: "Copy",
+        copiedText: "Copied!",
+        noTextsYet: "No shared text yet.",
+        noTextsSub: "Paste commands, logs, snippets, or URLs to share directly.",
+        textPlaceholder: "Paste or type a message, command, log, code snippet, or note…",
+        textTooLarge: "Text exceeds maximum allowed size",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "New message"
       },
       tr: {
         executableWarning: "Potansiyel olarak çalıştırılabilir dosya. Yalnızca güvendiğiniz dosyaları açın veya yükleyin.",
@@ -253,7 +266,20 @@
         networkError: "Oda kapatılırken ağ hatası oluştu",
         roomClosing: "ODA KAPATILIYOR",
         closingDesc: "Bu transfer odası otomatik olarak kapanacak:",
-        seconds: "saniye"
+        seconds: "saniye",
+        filesTab: "Dosyalar",
+        textTab: "Metin",
+        sendText: "Gönder",
+        sendingText: "Gönderiliyor…",
+        copyText: "Kopyala",
+        copiedText: "Kopyalandı!",
+        noTextsYet: "Henüz paylaşılan metin yok.",
+        noTextsSub: "Doğrudan paylaşmak için komut, günlük, kod parçacığı veya bağlantı yapıştırın.",
+        textPlaceholder: "Mesaj, komut, günlük, kod veya not yapıştırın ya da yazın…",
+        textTooLarge: "Metin izin verilen maksimum boyutu aşıyor",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "Yeni mesaj"
       },
       "zh-CN": {
         executableWarning: "可能为可执行文件。请仅打开或安装您信任的文件。",
@@ -269,7 +295,20 @@
         networkError: "关闭房间时发生网络错误",
         roomClosing: "房间即将关闭",
         closingDesc: "此传输房间将在以下时间内自动关闭：",
-        seconds: "秒"
+        seconds: "秒",
+        filesTab: "文件",
+        textTab: "文本",
+        sendText: "发送",
+        sendingText: "正在发送…",
+        copyText: "复制",
+        copiedText: "已复制！",
+        noTextsYet: "暂无共享文本。",
+        noTextsSub: "直接粘贴命令、日志、代码片段或链接进行共享。",
+        textPlaceholder: "粘贴或输入消息、命令、日志、代码或备注…",
+        textTooLarge: "文本超出允许的最大大小",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "新消息"
       },
       hi: {
         executableWarning: "संभावित रूप से निष्पादन योग्य फ़ाइल। केवल उन्हीं फ़ाइलों को खोलें या इंस्टॉल करें जिन पर आप भरोसा करते हैं।",
@@ -285,7 +324,20 @@
         networkError: "कमरा बंद करते समय नेटवर्क त्रुटि",
         roomClosing: "कमरा बंद हो रहा है",
         closingDesc: "यह ट्रांसफर रूम स्वचालित रूप से बंद हो जाएगा:",
-        seconds: "सेकंड"
+        seconds: "सेकंड",
+        filesTab: "फ़ाइलें",
+        textTab: "पाठ",
+        sendText: "भेजें",
+        sendingText: "भेजा जा रहा है…",
+        copyText: "कॉपी करें",
+        copiedText: "कॉपी हो गया!",
+        noTextsYet: "अभी तक कोई साझा पाठ नहीं है।",
+        noTextsSub: "कमांड, लॉग, कोड स्निपेट या लिंक पेस्ट करें।",
+        textPlaceholder: "संदेश, कमांड, लॉग, कोड या नोट पेस्ट या टाइप करें…",
+        textTooLarge: "पाठ अनुमत अधिकतम आकार से अधिक है",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "नया संदेश"
       },
       es: {
         executableWarning: "Archivo potencialmente ejecutable. Solo abra o instale archivos de confianza.",
@@ -301,7 +353,20 @@
         networkError: "Error de red al cerrar la sala",
         roomClosing: "CERRANDO SALA",
         closingDesc: "Esta sala de transferencia se cerrará automáticamente en",
-        seconds: "segundos"
+        seconds: "segundos",
+        filesTab: "Archivos",
+        textTab: "Texto",
+        sendText: "Enviar",
+        sendingText: "Enviando…",
+        copyText: "Copiar",
+        copiedText: "¡Copiado!",
+        noTextsYet: "Aún no hay texto compartido.",
+        noTextsSub: "Pega comandos, registros, fragmentos o enlaces para compartir directamente.",
+        textPlaceholder: "Pega o escribe un mensaje, comando, registro, código o nota…",
+        textTooLarge: "El texto excede el tamaño máximo permitido",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "Nuevo mensaje"
       },
       fr: {
         executableWarning: "Fichier potentiellement exécutable. N'ouvrez ou n'installez que des fichiers de confiance.",
@@ -317,7 +382,20 @@
         networkError: "Erreur réseau lors de la fermeture du salon",
         roomClosing: "FERMETURE DU SALON",
         closingDesc: "Ce salon de transfert fermera automatiquement dans",
-        seconds: "secondes"
+        seconds: "secondes",
+        filesTab: "Fichiers",
+        textTab: "Texte",
+        sendText: "Envoyer",
+        sendingText: "Envoi en cours…",
+        copyText: "Copier",
+        copiedText: "Copié !",
+        noTextsYet: "Aucun texte partagé pour le moment.",
+        noTextsSub: "Collez des commandes, journaux, extraits ou liens à partager directement.",
+        textPlaceholder: "Collez ou écrivez un message, commande, journal, code ou note…",
+        textTooLarge: "Le texte dépasse la taille maximale autorisée",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "Nouveau message"
       },
       ar: {
         executableWarning: "ملف قابل للتنفيذ المحتمل. افتح أو ثبّت فقط الملفات التي تثق بها.",
@@ -333,7 +411,20 @@
         networkError: "خطأ في الشبكة أثناء إغلاق الغرفة",
         roomClosing: "جارٍ إغلاق الغرفة",
         closingDesc: "ستُغلق غرفة النقل هذه تلقائيًا خلال",
-        seconds: "ثوانٍ"
+        seconds: "ثوانٍ",
+        filesTab: "الملفات",
+        textTab: "النص",
+        sendText: "إرسال",
+        sendingText: "جارٍ الإرسال…",
+        copyText: "نسخ",
+        copiedText: "تم النسخ!",
+        noTextsYet: "لا يوجد نص مشترك حتى الآن.",
+        noTextsSub: "الصق الأوامر، السجلات، المقتطفات أو الروابط للمشاركة مباشرة.",
+        textPlaceholder: "الصق أو اكتب رسالة، أمرًا، سجلًا، رمزًا أو ملاحظة…",
+        textTooLarge: "يتجاوز النص الحد الأقصى للحجم المسموح به",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "رسالة جديدة"
       },
       bn: {
         executableWarning: "সম্ভাব্য এক্সিকিউটেবল ফাইল। শুধুমাত্র আপনার বিশ্বস্ত ফাইল খুলুন বা ইনস্টল করুন।",
@@ -349,7 +440,20 @@
         networkError: "রুম বন্ধ করার সময় নেটওয়ার্ক ত্রুটি",
         roomClosing: "রুম বন্ধ হচ্ছে",
         closingDesc: "এই ট্রান্সফার রুমটি স্বয়ংক্রিয়ভাবে বন্ধ হয়ে যাবে:",
-        seconds: "সেকেন্ড"
+        seconds: "সেকেন্ড",
+        filesTab: "ফাইল",
+        textTab: "টেক্সট",
+        sendText: "পাঠান",
+        sendingText: "পাঠানো হচ্ছে…",
+        copyText: "কপি করুন",
+        copiedText: "কপি হয়েছে!",
+        noTextsYet: "এখনো কোনো টেক্সট শেয়ার করা হয়নি।",
+        noTextsSub: "সরাসরি শেয়ার করতে কমান্ড, লগ, কোড বা লিঙ্ক পেস্ট করুন।",
+        textPlaceholder: "বার্তা, কমান্ড, লগ, কোড বা নোট পেস্ট বা টাইপ করুন…",
+        textTooLarge: "টেক্সটের আকার অনুমোদিত সীমা অতিক্রম করেছে",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "নতুন বার্তা"
       },
       pt: {
         executableWarning: "Arquivo potencialmente executável. Apenas abra ou instale arquivos confiáveis.",
@@ -365,7 +469,20 @@
         networkError: "Erro de rede ao fechar a sala",
         roomClosing: "FECHANDO SALA",
         closingDesc: "Esta sala de transferência fechará automaticamente em",
-        seconds: "segundos"
+        seconds: "segundos",
+        filesTab: "Arquivos",
+        textTab: "Texto",
+        sendText: "Enviar",
+        sendingText: "Enviando…",
+        copyText: "Copiar",
+        copiedText: "Copiado!",
+        noTextsYet: "Nenhum texto compartilhado ainda.",
+        noTextsSub: "Cole comandos, registros, snippets ou links para compartilhar diretamente.",
+        textPlaceholder: "Cole ou digite uma mensagem, comando, log, código ou nota…",
+        textTooLarge: "O texto excede o tamanho máximo permitido",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "Nova mensagem"
       },
       ru: {
         executableWarning: "Потенциально исполняемый файл. Открывайте и устанавливайте только файлы, которым доверяете.",
@@ -381,7 +498,20 @@
         networkError: "Сетевая ошибка при закрытии комнаты",
         roomClosing: "ЗАКРЫТИЕ КОМНАТЫ",
         closingDesc: "Эта комната передачи закроется автоматически через",
-        seconds: "сек."
+        seconds: "сек.",
+        filesTab: "Файлы",
+        textTab: "Текст",
+        sendText: "Отправить",
+        sendingText: "Отправка…",
+        copyText: "Копировать",
+        copiedText: "Скопировано!",
+        noTextsYet: "Пока нет сообщений.",
+        noTextsSub: "Вставьте команды, логи, код или ссылки для быстрой передачи.",
+        textPlaceholder: "Вставьте или введите сообщение, команду, лог, код или заметку…",
+        textTooLarge: "Размер текста превышает максимально допустимый",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "Новое сообщение"
       },
       ur: {
         executableWarning: "ممکنہ طور پر قابل عمل فائل۔ صرف ان فائلوں کو کھولیں یا انسٹال کریں جن پر آپ کو بھروسہ ہو۔",
@@ -397,7 +527,20 @@
         networkError: "کمرہ بند کرتے وقت نیٹ ورک خرابی",
         roomClosing: "کمرہ بند ہو رہا ہے",
         closingDesc: "یہ ٹرانسفر روم خودکار طریقے سے بند ہو جائے گا:",
-        seconds: "سیکنڈ"
+        seconds: "سیکنڈ",
+        filesTab: "فائلیں",
+        textTab: "متن",
+        sendText: "ارسال کریں",
+        sendingText: "بھیجا جا رہا ہے…",
+        copyText: "کاپی کریں",
+        copiedText: "کاپی ہو گیا!",
+        noTextsYet: "ابھی تک کوئی مشترکہ متن نہیں ہے۔",
+        noTextsSub: "براہ راست شیئر کرنے کے لیے کمانڈز، لاگز، کوڈ یا لنکس پیسٹ کریں۔",
+        textPlaceholder: "پیغام، کمانڈ، لاگ، کوڈ یا نوٹ پیسٹ یا ٹائپ کریں…",
+        textTooLarge: "متن اجازت شدہ زیادہ سے زیادہ سائز سے زیادہ ہے",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "نیا پیغام"
       },
       id: {
         executableWarning: "File yang berpotensi dapat dieksekusi. Hanya buka atau instal file yang Anda percayai.",
@@ -413,7 +556,20 @@
         networkError: "Kesalahan jaringan saat menutup ruangan",
         roomClosing: "MENUTUP RUANGAN",
         closingDesc: "Ruangan transfer ini akan ditutup secara otomatis dalam",
-        seconds: "detik"
+        seconds: "detik",
+        filesTab: "File",
+        textTab: "Teks",
+        sendText: "Kirim",
+        sendingText: "Mengirim…",
+        copyText: "Salin",
+        copiedText: "Tersalin!",
+        noTextsYet: "Belum ada teks yang dibagikan.",
+        noTextsSub: "Tempel perintah, log, cuplikan kode, atau tautan untuk dibagikan langsung.",
+        textPlaceholder: "Tempel atau ketik pesan, perintah, log, kode, atau catatan…",
+        textTooLarge: "Teks melebihi ukuran maksimum yang diizinkan",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "Pesan baru"
       },
       de: {
         executableWarning: "Potenziell ausführbare Datei. Öffnen oder installieren Sie nur Dateien, denen Sie vertrauen.",
@@ -429,7 +585,20 @@
         networkError: "Netzwerkfehler beim Schließen des Raums",
         roomClosing: "RAUM WIRD GESCHLOSSEN",
         closingDesc: "Dieser Übertragungsraum wird automatisch geschlossen in",
-        seconds: "Sekunden"
+        seconds: "Sekunden",
+        filesTab: "Dateien",
+        textTab: "Text",
+        sendText: "Senden",
+        sendingText: "Wird gesendet…",
+        copyText: "Kopieren",
+        copiedText: "Kopiert!",
+        noTextsYet: "Noch kein geteilter Text.",
+        noTextsSub: "Fügen Sie Befehle, Protokolle, Code oder Links zum direkten Teilen ein.",
+        textPlaceholder: "Fügen Sie eine Nachricht, einen Befehl, Protokolle, Code oder eine Notiz ein…",
+        textTooLarge: "Text überschreitet die maximal zulässige Größe",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "Neue Nachricht"
       },
       ja: {
         executableWarning: "実行可能ファイルの可能性があります。信頼できるファイルのみを開くかインストールしてください。",
@@ -445,7 +614,20 @@
         networkError: "ルーム終了中にネットワークエラーが発生しました",
         roomClosing: "ルームを終了中",
         closingDesc: "この転送ルームは自動的に終了します:",
-        seconds: "秒"
+        seconds: "秒",
+        filesTab: "ファイル",
+        textTab: "テキスト",
+        sendText: "送信",
+        sendingText: "送信中…",
+        copyText: "コピー",
+        copiedText: "コピーしました！",
+        noTextsYet: "共有されたテキストはまだありません。",
+        noTextsSub: "コマンド、ログ、コード、リンクを貼り付けて直接共有できます。",
+        textPlaceholder: "メッセージ、コマンド、ログ、コード、メモを貼り付けるか入力…",
+        textTooLarge: "テキストが許可された最大サイズを超えています",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "新着メッセージ"
       },
       mr: {
         executableWarning: "संभाव्य एक्झिक्युटेबल फाइल. फक्त तुमच्या विश्वासू फाइल्स उघडा किंवा इन्स्टॉल करा.",
@@ -461,7 +643,20 @@
         networkError: "रूम बंद करताना नेटवर्क त्रुटी",
         roomClosing: "रूम बंद होत आहे",
         closingDesc: "हा ट्रान्सफर रूम आपोआप बंद होईल:",
-        seconds: "सेकंद"
+        seconds: "सेकंद",
+        filesTab: "फायली",
+        textTab: "मजकूर",
+        sendText: "पाठवा",
+        sendingText: "पाठवत आहे…",
+        copyText: "कॉपी करा",
+        copiedText: "कॉपी केले!",
+        noTextsYet: "अद्याप कोणताही शेअर केलेला मजकूर नाही.",
+        noTextsSub: "थेट शेअर करण्यासाठी कमांड्स, लॉग्स, कोड किंवा लिंक्स पेस्ट करा.",
+        textPlaceholder: "संदेश, कमांड, लॉग, कोड स्निपेट किंवा नोंद पेस्ट किंवा टाइप करा…",
+        textTooLarge: "मजकूर कमाल परवानगी असलेल्या आकारापेक्षा मोठा आहे",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "नवीन संदेश"
       },
       te: {
         executableWarning: "సంభావ్య ఎక్జిక్యూటబుల్ ఫైల్. మీరు విశ్వసించే ఫైల్‌లను మాత్రమే తెరవండి లేదా ఇన్‌స్టాల్ చేయండి.",
@@ -477,7 +672,20 @@
         networkError: "గదిని మూసివేసేటప్పుడు నెట్‌వర్క్ లోపం",
         roomClosing: "గది మూసివేయబడుతోంది",
         closingDesc: "ఈ బదిలీ గది స్వయంచాలకంగా మూసివేయబడుతుంది:",
-        seconds: "సెకన్లు"
+        seconds: "సెకన్లు",
+        filesTab: "ఫైల్‌లు",
+        textTab: "టెక్స్ట్",
+        sendText: "పంపు",
+        sendingText: "పంపుతోంది…",
+        copyText: "కాపీ చేయి",
+        copiedText: "కాపీ చేయబడింది!",
+        noTextsYet: "ఇంకా భాగస్వామ్య టెక్స్ట్ లేదు.",
+        noTextsSub: "కమాండ్‌లు, లాగ్‌లు, కోడ్ లేదా లింక్‌లను నేరుగా షేర్ చేయడానికి అతికించండి.",
+        textPlaceholder: "సందేశం, కమాండ్, లాగ్, కోడ్ లేదా నోట్‌ని అతికించండి లేదా టైప్ చేయండి…",
+        textTooLarge: "టెక్స్ట్ అనుమతించబడిన గరిష్ట పరిమాణాన్ని మించిపోయింది",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "కొత్త సందేశం"
       },
       nl: {
         executableWarning: "Mogelijk uitvoerbaar bestand. Open of installeer alleen bestanden die u vertrouwt.",
@@ -493,7 +701,20 @@
         networkError: "Netwerkfout bij het sluiten van de kamer",
         roomClosing: "KAMER SLUITEN",
         closingDesc: "Deze overdrachtskamer sluit automatisch over",
-        seconds: "seconden"
+        seconds: "seconden",
+        filesTab: "Bestanden",
+        textTab: "Tekst",
+        sendText: "Versturen",
+        sendingText: "Versturen…",
+        copyText: "Kopiëren",
+        copiedText: "Gekopieerd!",
+        noTextsYet: "Nog geen gedeelde tekst.",
+        noTextsSub: "Plak opdrachten, logs, code of links om direct te delen.",
+        textPlaceholder: "Plak of typ een bericht, opdracht, log, codefragment of notitie…",
+        textTooLarge: "Tekst overschrijdt de maximaal toegestane grootte",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "Nieuw bericht"
       },
       it: {
         executableWarning: "File potenzialmente eseguibile. Apri o installa solo i file di cui ti fidi.",
@@ -509,7 +730,20 @@
         networkError: "Errore di rete durante la chiusura della stanza",
         roomClosing: "CHIUSURA STANZA",
         closingDesc: "Questa stanza di trasferimento si chiuderà automaticamente tra",
-        seconds: "secondi"
+        seconds: "secondi",
+        filesTab: "File",
+        textTab: "Testo",
+        sendText: "Invia",
+        sendingText: "Invio in corso…",
+        copyText: "Copia",
+        copiedText: "Copiato!",
+        noTextsYet: "Nessun testo condiviso ancora.",
+        noTextsSub: "Incolla comandi, log, frammenti di codice o link da condividere direttamente.",
+        textPlaceholder: "Incolla o digita un messaggio, comando, log, codice o nota…",
+        textTooLarge: "Il testo supera la dimensione massima consentita",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "Nuovo messaggio"
       },
       ko: {
         executableWarning: "실행 가능한 파일일 수 있습니다. 신뢰할 수 있는 파일만 열거나 설치하십시오.",
@@ -525,7 +759,20 @@
         networkError: "방 닫는 중 네트워크 오류 발생",
         roomClosing: "방 종료 중",
         closingDesc: "이 전송 방은 다음 시간 후에 자동으로 닫힙니다:",
-        seconds: "초"
+        seconds: "초",
+        filesTab: "파일",
+        textTab: "텍스트",
+        sendText: "보내기",
+        sendingText: "전송 중…",
+        copyText: "복사",
+        copiedText: "복사됨!",
+        noTextsYet: "공유된 텍스트가 아직 없습니다.",
+        noTextsSub: "명령어, 로그, 코드 조각 또는 링크를 붙여넣어 바로 공유하세요.",
+        textPlaceholder: "메시지, 명령어, 로그, 코드 또는 메모를 붙여넣거나 입력하세요…",
+        textTooLarge: "텍스트가 허용된 최대 크기를 초과했습니다",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "새 메시지"
       },
       pl: {
         executableWarning: "Plik potencjalnie wykonywalny. Otwieraj lub instaluj wyłącznie pliki, którym ufasz.",
@@ -541,7 +788,20 @@
         networkError: "Błąd sieci podczas zamykania pokoju",
         roomClosing: "ZAMYKANIE POKOJU",
         closingDesc: "Ten pokój transferowy zamknie się automatycznie za",
-        seconds: "sekund"
+        seconds: "sekund",
+        filesTab: "Pliki",
+        textTab: "Tekst",
+        sendText: "Wyślij",
+        sendingText: "Wysyłanie…",
+        copyText: "Kopiuj",
+        copiedText: "Skopiowano!",
+        noTextsYet: "Brak udostępnionego tekstu.",
+        noTextsSub: "Wklej polecenia, dzienniki, fragmenty kodu lub linki do bezpośredniego udostępnienia.",
+        textPlaceholder: "Wklej lub wpisz wiadomość, polecenie, dziennik, kod lub notatkę…",
+        textTooLarge: "Tekst przekracza maksymalny dozwolony rozmiar",
+        client: "CLIENT",
+        server: "SERVER",
+        newMessage: "Nowa wiadomość"
       }
     };
 
@@ -953,6 +1213,191 @@
     }
 
     // --------------------------------------------------------------------------
+    // Client Ephemeral Session ID (Per Room)
+    // --------------------------------------------------------------------------
+    function getClientSessionId() {
+      const key = `hamal_client_session_${token}`;
+      let sid = '';
+      try {
+        sid = sessionStorage.getItem(key) || '';
+      } catch (_) {}
+      if (!sid) {
+        sid = 'cs_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        try {
+          sessionStorage.setItem(key, sid);
+        } catch (_) {}
+      }
+      return sid;
+    }
+
+    async function copyTextToClipboard(text, btn) {
+      if (!text) return;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+      } catch (_) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        } catch (_) {}
+      }
+      if (btn) {
+        btn.classList.add('copied');
+        const copyLabel = btn.querySelector('.copy-label');
+        if (copyLabel) copyLabel.textContent = t.copiedText || 'Copied!';
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          if (copyLabel) copyLabel.textContent = t.copyText || 'Copy';
+        }, 2000);
+      }
+    }
+
+    // --------------------------------------------------------------------------
+    // Text List Rendering (Direct Text Sharing Stream)
+    // --------------------------------------------------------------------------
+    function renderTextList(texts) {
+      const textListEl = document.getElementById('text-list');
+      const textCountEl = document.getElementById('text-count');
+      const tabBadgeEl = document.getElementById('tab-text-badge');
+      const navCountEl = document.getElementById('nav-text-count');
+
+      if (!textListEl) return;
+
+      const count = texts ? texts.length : 0;
+      if (textCountEl) textCountEl.textContent = String(count);
+      if (tabBadgeEl) tabBadgeEl.textContent = String(count);
+      if (navCountEl) navCountEl.textContent = String(count);
+
+      if (count === 0) {
+        textListEl.innerHTML = `
+          <div id="no-texts-msg" class="empty-state-box empty-state empty-state-wrap">
+            <p class="empty-state-title" id="no-texts-title">${t.noTextsYet || 'No shared text yet.'}</p>
+            <p class="empty-state-lead empty-state-text" id="no-texts-desc">${t.noTextsSub || 'Type or paste text above to share with the room.'}</p>
+          </div>
+        `;
+        return;
+      }
+
+      const wasNearBottom = (textListEl.scrollHeight - textListEl.scrollTop - textListEl.clientHeight) < 70;
+      textListEl.innerHTML = '';
+
+      texts.forEach((item) => {
+        const isServer = item.sender_type === 'server';
+        const isSelf = Boolean(item.is_self);
+        const card = document.createElement('div');
+        card.className = `text-item-card sender-${isServer ? 'server' : 'client'} ${isServer ? 'sender-server' : (isSelf ? 'client-self' : 'client-peer')}`;
+        card.dataset.textId = item.id;
+
+        const header = document.createElement('div');
+        header.className = 'text-item-header';
+
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'text-sender-meta';
+
+        const senderTag = document.createElement('div');
+        senderTag.className = `text-sender-tag ${isServer ? 'server' : (isSelf ? 'client-self' : 'client-peer')}`;
+
+        const roleSpan = document.createElement('span');
+        roleSpan.className = 'sender-role font-mono';
+        roleSpan.textContent = isServer ? (t.server || 'SERVER') : (t.client || 'CLIENT');
+        senderTag.appendChild(roleSpan);
+        metaDiv.appendChild(senderTag);
+
+        if (item.created_at) {
+          const timeSpan = document.createElement('span');
+          timeSpan.className = 'text-item-time';
+          try {
+            const d = new Date(item.created_at);
+            timeSpan.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          } catch (_) {}
+          metaDiv.appendChild(timeSpan);
+        }
+        header.appendChild(metaDiv);
+
+        if (!isServer) {
+          const copyBtn = document.createElement('button');
+          copyBtn.type = 'button';
+          copyBtn.className = 'btn-copy-text';
+          copyBtn.title = t.copyText || 'Copy';
+          copyBtn.setAttribute('aria-label', 'Copy message text');
+          copyBtn.innerHTML = `
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            <span class="copy-label">${t.copyText || 'Copy'}</span>
+          `;
+
+          copyBtn.addEventListener('click', async () => {
+            await copyTextToClipboard(item.content, copyBtn);
+          });
+          header.appendChild(copyBtn);
+        }
+
+        card.appendChild(header);
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'text-item-content font-mono';
+
+        const urlRegex = /(https?:\/\/[^\s<>"'`]+)/g;
+        let lastIdx = 0;
+        let match;
+        const contentText = item.content || '';
+
+        while ((match = urlRegex.exec(contentText)) !== null) {
+          if (match.index > lastIdx) {
+            contentDiv.appendChild(document.createTextNode(contentText.substring(lastIdx, match.index)));
+          }
+          const url = match[0];
+          const link = document.createElement('a');
+          link.href = url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.className = 'text-content-link';
+          link.textContent = url;
+          contentDiv.appendChild(link);
+          lastIdx = match.index + url.length;
+        }
+        if (lastIdx < contentText.length) {
+          contentDiv.appendChild(document.createTextNode(contentText.substring(lastIdx)));
+        }
+
+        card.appendChild(contentDiv);
+        textListEl.appendChild(card);
+      });
+
+      if (wasNearBottom) {
+        textListEl.scrollTop = textListEl.scrollHeight;
+      }
+    }
+
+    function bindExistingCopyButtons() {
+      document.querySelectorAll('.btn-copy-text').forEach((btn) => {
+        if (btn.dataset.bound) return;
+        btn.dataset.bound = 'true';
+        btn.addEventListener('click', async () => {
+          const card = btn.closest('.text-item-card');
+          const contentEl = card ? card.querySelector('.text-item-content') : null;
+          const content = contentEl ? contentEl.textContent : '';
+          await copyTextToClipboard(content, btn);
+        });
+      });
+    }
+
+    // --------------------------------------------------------------------------
     // Polling Loop
     // --------------------------------------------------------------------------
     async function pollStatus() {
@@ -1034,6 +1479,21 @@
           const filesData = await filesRes.json();
           renderFileList(filesData.files || []);
         }
+
+        const textsRes = await fetch(`/api/v1/rooms/${encodeURIComponent(token)}/texts`, {
+          cache: 'no-store',
+          headers: {
+            'X-Client-Session-ID': getClientSessionId(),
+          },
+        });
+        if (textsRes.status === 404 || textsRes.status === 410) {
+          showInactive('Room Closed', 'This temporary room is no longer accessible.');
+          return;
+        }
+        if (textsRes.ok) {
+          const textsData = await textsRes.json();
+          renderTextList(textsData.texts || []);
+        }
       } catch (e) {
         // Network glitches are gracefully skipped during polling
       }
@@ -1046,6 +1506,7 @@
     pollTimer = setTimeout(pollStatus, 2000);
     renderActivityList();
     renderParticipantList([], 0);
+    bindExistingCopyButtons();
 
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && !isTerminated) {
@@ -1586,9 +2047,11 @@
     // Navigation tab switching in Creator view
     const navBtnFiles = document.getElementById('nav-btn-files');
     const navBtnRoom = document.getElementById('nav-btn-room');
+    const navBtnTexts = document.getElementById('nav-btn-texts');
     if (navBtnFiles) {
       navBtnFiles.addEventListener('click', () => {
         if (navBtnRoom) navBtnRoom.classList.remove('active');
+        if (navBtnTexts) navBtnTexts.classList.remove('active');
         navBtnFiles.classList.add('active');
         const fileListEl = document.getElementById('file-list');
         if (fileListEl) {
@@ -1599,8 +2062,207 @@
     if (navBtnRoom) {
       navBtnRoom.addEventListener('click', () => {
         if (navBtnFiles) navBtnFiles.classList.remove('active');
+        if (navBtnTexts) navBtnTexts.classList.remove('active');
         navBtnRoom.classList.add('active');
       });
     }
+
+    // --------------------------------------------------------------------------
+    // Mode Switcher (Files vs Text) & Text Sharing Logic
+    // --------------------------------------------------------------------------
+    const tabFiles = document.getElementById('tab-files');
+    const tabText = document.getElementById('tab-text');
+    const filesModeContainer = document.getElementById('files-mode-container');
+    const textModeContainer = document.getElementById('text-mode-container');
+    const creatorDropzone = document.getElementById('dropzone');
+    const creatorTextCompose = document.getElementById('creator-text-compose');
+    const creatorFilesSection = document.getElementById('creator-files-section');
+    const creatorTextsSection = document.getElementById('creator-texts-section');
+
+    function activateFilesTab() {
+      if (tabFiles) {
+        tabFiles.classList.add('active');
+        tabFiles.setAttribute('aria-selected', 'true');
+      }
+      if (tabText) {
+        tabText.classList.remove('active');
+        tabText.setAttribute('aria-selected', 'false');
+      }
+      if (filesModeContainer) filesModeContainer.style.display = '';
+      if (textModeContainer) textModeContainer.style.display = 'none';
+
+      if (creatorDropzone) creatorDropzone.style.display = '';
+      if (creatorTextCompose) creatorTextCompose.style.display = 'none';
+      if (creatorFilesSection) creatorFilesSection.style.display = '';
+      if (creatorTextsSection) creatorTextsSection.style.display = 'none';
+
+      if (navBtnFiles) navBtnFiles.classList.add('active');
+      if (navBtnTexts) navBtnTexts.classList.remove('active');
+    }
+
+    function activateTextTab() {
+      if (tabText) {
+        tabText.classList.add('active');
+        tabText.setAttribute('aria-selected', 'true');
+      }
+      if (tabFiles) {
+        tabFiles.classList.remove('active');
+        tabFiles.setAttribute('aria-selected', 'false');
+      }
+      if (filesModeContainer) filesModeContainer.style.display = 'none';
+      if (textModeContainer) textModeContainer.style.display = '';
+
+      if (creatorDropzone) creatorDropzone.style.display = 'none';
+      if (creatorTextCompose) creatorTextCompose.style.display = '';
+      if (creatorFilesSection) creatorFilesSection.style.display = 'none';
+      if (creatorTextsSection) creatorTextsSection.style.display = '';
+
+      if (navBtnTexts) navBtnTexts.classList.add('active');
+      if (navBtnFiles) navBtnFiles.classList.remove('active');
+    }
+
+    if (tabFiles) {
+      tabFiles.addEventListener('click', activateFilesTab);
+    }
+    if (tabText) {
+      tabText.addEventListener('click', activateTextTab);
+    }
+    if (navBtnTexts) {
+      navBtnTexts.addEventListener('click', () => {
+        activateTextTab();
+        if (creatorTextsSection) {
+          creatorTextsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    }
+
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (window.location.hash === '#text' || urlParams.get('tab') === 'text') {
+        activateTextTab();
+      }
+    } catch (_) {}
+
+    const textInput = document.getElementById('text-input');
+    const sendTextBtn = document.getElementById('send-text-btn');
+    const textSizeCounter = document.getElementById('text-size-counter');
+    const textComposeError = document.getElementById('text-compose-error');
+    const maxTextSize = parseInt(document.body.dataset.maxTextSize || '65536', 10);
+
+    function updateTextCounter() {
+      if (!textInput || !textSizeCounter) return;
+      const val = textInput.value;
+      const bytes = new Blob([val]).size;
+      const formattedCur = formatBytes(bytes);
+      const formattedMax = formatBytes(maxTextSize);
+      textSizeCounter.textContent = `${formattedCur} / ${formattedMax}`;
+      if (bytes > maxTextSize) {
+        textSizeCounter.style.color = 'var(--accent-danger)';
+        if (sendTextBtn) sendTextBtn.disabled = true;
+      } else {
+        textSizeCounter.style.color = '';
+        if (sendTextBtn && !sendTextBtn.dataset.sending) sendTextBtn.disabled = false;
+      }
+    }
+
+    if (textInput) {
+      updateTextCounter();
+      textInput.addEventListener('input', () => {
+        updateTextCounter();
+        if (textComposeError) textComposeError.style.display = 'none';
+      });
+
+      const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || window.innerWidth <= 768;
+      textInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          if (e.ctrlKey || e.metaKey || (!e.shiftKey && !isMobile)) {
+            e.preventDefault();
+            submitText();
+          }
+        }
+      });
+    }
+
+    async function submitText() {
+      if (!textInput || isTerminated || !token) return;
+      const content = textInput.value.trim();
+      if (!content) return;
+
+      const bytes = new Blob([content]).size;
+      if (bytes > maxTextSize) {
+        if (textComposeError) {
+          textComposeError.textContent = t.textTooLarge || 'Text exceeds maximum allowed size';
+          textComposeError.style.display = 'block';
+        }
+        return;
+      }
+
+      if (sendTextBtn) {
+        sendTextBtn.disabled = true;
+        sendTextBtn.dataset.sending = 'true';
+        const label = sendTextBtn.querySelector('#send-text-label') || sendTextBtn.querySelector('span');
+        if (label) label.textContent = t.sendingText || 'Sending…';
+      }
+      if (textComposeError) textComposeError.style.display = 'none';
+
+      try {
+        const sessionId = getClientSessionId();
+        const res = await fetch(`/api/v1/rooms/${encodeURIComponent(token)}/texts`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Client-Session-ID': sessionId,
+          },
+          body: JSON.stringify({
+            content: content,
+            client_session_id: sessionId,
+          }),
+        });
+
+        if (res.status === 201) {
+          textInput.value = '';
+          updateTextCounter();
+          addRecentActivity('upload', 'Shared snippet', page === 'creator' ? 'Shared by Host' : 'Shared by Participant');
+          const textsRes = await fetch(`/api/v1/rooms/${encodeURIComponent(token)}/texts`, {
+            cache: 'no-store',
+            headers: {
+              'X-Client-Session-ID': sessionId,
+            },
+          });
+          if (textsRes.ok) {
+            const textsData = await textsRes.json();
+            renderTextList(textsData.texts || []);
+            const textListEl = document.getElementById('text-list');
+            if (textListEl) {
+              textListEl.scrollTop = textListEl.scrollHeight;
+            }
+          }
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          if (textComposeError) {
+            textComposeError.textContent = errData.error || 'Failed to send text';
+            textComposeError.style.display = 'block';
+          }
+        }
+      } catch (err) {
+        if (textComposeError) {
+          textComposeError.textContent = 'Network error while sending text';
+          textComposeError.style.display = 'block';
+        }
+      } finally {
+        if (sendTextBtn) {
+          delete sendTextBtn.dataset.sending;
+          sendTextBtn.disabled = false;
+          const label = sendTextBtn.querySelector('#send-text-label') || sendTextBtn.querySelector('span');
+          if (label) label.textContent = t.sendText || 'Send Text';
+        }
+      }
+    }
+
+    if (sendTextBtn) {
+      sendTextBtn.addEventListener('click', submitText);
+    }
   }
 })();
+

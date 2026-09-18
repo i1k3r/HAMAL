@@ -7,7 +7,7 @@
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#0B0D0F" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#F7F8FA" media="(prefers-color-scheme: light)">
-  <title>HAMAL · Participant Connection</title>
+  <title>HAMAL · Client Connection</title>
   <link rel="icon" type="image/svg+xml" href="/static/brand/hamal-app-icon.svg">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/static/brand/hamal-app-icon.svg">
@@ -33,7 +33,7 @@
         <a href="/" class="brand-wrapper" title="HAMAL">
           <img src="/static/brand/hamal-logo-light.svg" alt="HAMAL" class="brand-logo logo-light" width="92" height="20">
           <img src="/static/brand/hamal-logo-dark.svg" alt="HAMAL" class="brand-logo logo-dark" width="92" height="20">
-          <span class="header-tag">PARTICIPANT</span>
+          <span class="header-tag">CLIENT</span>
         </a>
       </div>
 
@@ -145,71 +145,151 @@
           </div>
         </div>
 
-        <!-- Touch-First Upload Card -->
-        <div class="dropzone-card" style="{{if eq .Status "closing"}}display: none;{{end}}">
-          <div id="dropzone" class="dropzone dropzone-touch-panel" role="button" tabindex="0" onclick="document.getElementById('file-input').click()">
-            <div class="dropzone-icon-wrap">
-              <svg id="dropzone-icon" class="dropzone-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="17 8 12 3 7 8"></polyline>
-                <line x1="12" y1="3" x2="12" y2="15"></line>
+        <!-- Sharing Mode Switcher (Files vs Text) -->
+        <div class="sharing-mode-nav" style="{{if eq .Status "closing"}}display: none;{{end}}">
+          <div class="mode-tabs-wrap" role="tablist" aria-label="Sharing Mode">
+            <button type="button" id="tab-files" class="mode-tab-btn active" role="tab" aria-selected="true" aria-controls="files-mode-container">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
               </svg>
+              <span id="tab-files-label">Files</span>
+              <span id="tab-files-badge" class="mode-pill">{{len .Files}}</span>
+            </button>
+            <button type="button" id="tab-text" class="mode-tab-btn" role="tab" aria-selected="false" aria-controls="text-mode-container">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+              <span id="tab-text-label">Text</span>
+              <span id="tab-text-badge" class="mode-pill">{{len .Texts}}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Files Mode Container -->
+        <div id="files-mode-container" class="sharing-mode-panel active" style="{{if eq .Status "closing"}}display: none;{{end}}">
+          <!-- Touch-First Upload Card -->
+          <div class="dropzone-card">
+            <div id="dropzone" class="dropzone dropzone-touch-panel" role="button" tabindex="0" onclick="document.getElementById('file-input').click()">
+              <div class="dropzone-icon-wrap">
+                <svg id="dropzone-icon" class="dropzone-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </div>
+              <p id="dropzone-title" class="dropzone-title dropzone-primary-text">UPLOAD FILES</p>
+              <p class="dropzone-hint dropzone-hint-text">Tap or drag files here</p>
+              <input type="file" id="file-input" multiple style="display: none;">
             </div>
-            <p id="dropzone-title" class="dropzone-title dropzone-primary-text">UPLOAD FILES</p>
-            <p class="dropzone-hint dropzone-hint-text">Tap or drag files here</p>
-            <input type="file" id="file-input" multiple style="display: none;">
+
+            <div id="upload-progress-container" class="upload-progress-container upload-progress-box" style="display: none;">
+              <div class="progress-info">
+                <span id="upload-filename" class="upload-filename">uploading…</span>
+                <span id="upload-percent" class="upload-percent font-mono">0%</span>
+              </div>
+              <div class="progress-track">
+                <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+              </div>
+            </div>
           </div>
 
-          <div id="upload-progress-container" class="upload-progress-container upload-progress-box" style="display: none;">
-            <div class="progress-info">
-              <span id="upload-filename" class="upload-filename">uploading…</span>
-              <span id="upload-percent" class="upload-percent font-mono">0%</span>
+          <!-- Files List Section -->
+          <div class="files-section">
+            <div class="files-header font-mono">
+              <span>FILES (<span id="file-count">{{len .Files}}</span>)</span>
             </div>
-            <div class="progress-track">
-              <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+
+            <div id="file-list" class="file-list">
+              {{if eq (len .Files) 0}}
+              <div id="no-files-msg" class="empty-state empty-state-wrap">
+                <p class="empty-state-title">Nothing here yet.</p>
+                <p class="empty-state-text">Waiting for files.</p>
+              </div>
+              {{else}}
+                {{range .Files}}
+                <div class="file-item" data-file-id="{{.ID}}">
+                  <div class="file-item-main">
+                    <div class="file-type-icon cat-generic">
+                      <svg class="pixel-icon pixel-icon-generic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                      </svg>
+                    </div>
+                    <div class="file-info">
+                      <span class="file-name" title="{{.OriginalFilename}}">{{.OriginalFilename}}</span>
+                      <span class="file-meta font-mono">{{.SizeBytes}} B</span>
+                    </div>
+                  </div>
+                  <div class="file-actions">
+                    <a href="/api/v1/rooms/{{$.ParticipantToken}}/files/{{.ID}}" download="{{.OriginalFilename}}" class="btn-download-icon btn-download" title="Download">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                      </svg>
+                    </a>
+                  </div>
+                </div>
+                {{end}}
+              {{end}}
             </div>
           </div>
         </div>
 
-        <!-- Files List Section -->
-        <div class="files-section" style="{{if eq .Status "closing"}}display: none;{{end}}">
-          <div class="files-header font-mono">
-            <span>FILES (<span id="file-count">{{len .Files}}</span>)</span>
+        <!-- Text Mode Container -->
+        <div id="text-mode-container" class="sharing-mode-panel" style="display: none;">
+          <!-- Compose Card -->
+          <div class="text-compose-card">
+            <div class="text-compose-header">
+              <label for="text-input" id="text-compose-label" class="text-compose-title font-sans">SEND TEXT OR LINK</label>
+              <span id="text-size-counter" class="text-counter font-mono">0 / 64 KB</span>
+            </div>
+            <div class="text-input-wrap">
+              <textarea id="text-input" class="text-textarea font-sans" placeholder="Type or paste text, URLs, or notes here…" maxlength="65536" rows="3" aria-label="Text message content"></textarea>
+            </div>
+            <div class="text-compose-actions">
+              <span id="text-compose-error" class="text-error-hint" style="display: none;"></span>
+              <button type="button" id="send-text-btn" class="btn btn-primary btn-send-text">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+                <span id="send-text-label">Send Text</span>
+              </button>
+            </div>
           </div>
 
-          <div id="file-list" class="file-list">
-            {{if eq (len .Files) 0}}
-            <div id="no-files-msg" class="empty-state empty-state-wrap">
-              <p class="empty-state-title">Nothing here yet.</p>
-              <p class="empty-state-text">Waiting for files.</p>
+          <!-- Text Messages Stream Section -->
+          <div class="texts-section">
+            <div class="texts-header font-mono">
+              <span>MESSAGES (<span id="text-count">{{len .Texts}}</span>)</span>
             </div>
-            {{else}}
-              {{range .Files}}
-              <div class="file-item" data-file-id="{{.ID}}">
-                <div class="file-item-main">
-                  <div class="file-type-icon cat-generic">
-                    <svg class="pixel-icon pixel-icon-generic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
-                      <polyline points="14 2 14 8 20 8"></polyline>
-                    </svg>
-                  </div>
-                  <div class="file-info">
-                    <span class="file-name" title="{{.OriginalFilename}}">{{.OriginalFilename}}</span>
-                    <span class="file-meta font-mono">{{.SizeBytes}} B</span>
-                  </div>
-                </div>
-                <div class="file-actions">
-                  <a href="/api/v1/rooms/{{$.ParticipantToken}}/files/{{.ID}}" download="{{.OriginalFilename}}" class="btn-download-icon btn-download" title="Download">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                      <polyline points="7 10 12 15 17 10"></polyline>
-                      <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                  </a>
-                </div>
+            <div id="text-list" class="text-list">
+              {{if eq (len .Texts) 0}}
+              <div id="no-texts-msg" class="empty-state empty-state-wrap">
+                <p class="empty-state-title" id="no-texts-title">No text messages yet.</p>
+                <p class="empty-state-text" id="no-texts-desc">Paste commands, logs, snippets, or URLs to share directly.</p>
               </div>
+              {{else}}
+                {{range .Texts}}
+                <div class="text-item-card sender-{{.SenderType}}" data-text-id="{{.ID}}">
+                  <div class="text-item-header">
+                    <div class="text-sender-tag {{.SenderType}}">
+                      <span class="sender-role font-mono">{{if eq .SenderType "server"}}SERVER{{else}}CLIENT{{end}}</span>
+                    </div>
+                    {{if ne .SenderType "server"}}
+                    <button type="button" class="btn-copy-text" title="Copy" aria-label="Copy message text">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                      <span class="copy-label">Copy</span>
+                    </button>
+                    {{end}}
+                  </div>
+                  <div class="text-item-content font-mono">{{.Content}}</div>
+                </div>
+                {{end}}
               {{end}}
-            {{end}}
+            </div>
           </div>
         </div>
 
