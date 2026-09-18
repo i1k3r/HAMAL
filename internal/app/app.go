@@ -586,21 +586,30 @@ func (a *App) routes() (http.Handler, error) {
 			textsList = []text.Text{}
 		}
 
+		var closeDeadlineStr string
+		if rm.CloseDeadline != nil {
+			closeDeadlineStr = rm.CloseDeadline.Format(time.RFC3339)
+		}
+
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
 		_ = tmpl.ExecuteTemplate(w, "creator.html", map[string]any{
-			"Year":               time.Now().Year(),
-			"CreatorToken":       token,
-			"ParticipantToken":   participantToken,
-			"ParticipantURL":     participantURL,
-			"ExpiresAtRFC3339":   rm.ExpiresAt.Format(time.RFC3339),
-			"Inactive":           false,
-			"PinRequired":        rm.PinRequired,
-			"IsLocked":           rm.IsLocked(),
-			"Files":              filesList,
-			"Texts":              textsList,
-			"MaxTextSize":        a.cfg.MaxTextSize,
-			"GlobalShareEnabled": a.cfg.GlobalShareEnabled,
-			"Shares":             sharesList,
+			"Year":                    time.Now().Year(),
+			"CreatorToken":            token,
+			"ParticipantToken":        participantToken,
+			"ParticipantURL":          participantURL,
+			"ExpiresAtRFC3339":        rm.ExpiresAt.Format(time.RFC3339),
+			"Status":                  rm.Status,
+			"CloseDeadline":           closeDeadlineStr,
+			"ClosingRemainingSeconds": rm.ClosingRemainingSeconds(),
+			"Inactive":                false,
+			"PinRequired":             rm.PinRequired,
+			"IsLocked":                rm.IsLocked(),
+			"Files":                   filesList,
+			"Texts":                   textsList,
+			"MaxTextSize":             a.cfg.MaxTextSize,
+			"GlobalShareEnabled":      a.cfg.GlobalShareEnabled,
+			"Shares":                  sharesList,
 		})
 	})
 

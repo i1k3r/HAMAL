@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#0B0D0F" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#0B0D0E" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#F7F8FA" media="(prefers-color-scheme: light)">
   <title>HAMAL · Fast, Private, Temporary File Transfer</title>
   <link rel="icon" type="image/svg+xml" href="/static/brand/hamal-app-icon.svg">
@@ -13,13 +13,12 @@
   <link rel="apple-touch-icon" href="/static/brand/hamal-app-icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/site.css">
   <script>
     (function() {
       var saved = localStorage.getItem('hamal_theme');
-      var prefDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      var theme = saved || (prefDark ? 'dark' : 'light');
+      var theme = saved || 'dark';
       document.documentElement.setAttribute('data-theme', theme);
     })();
   </script>
@@ -30,153 +29,314 @@
     <!-- Persistent Left Navigation Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-top">
-        <a href="/" class="sidebar-brand" title="HAMAL">
-          <img src="/static/brand/hamal-logo-light.svg" alt="HAMAL" class="sidebar-logo logo-light" width="100" height="22">
-          <img src="/static/brand/hamal-logo-dark.svg" alt="HAMAL" class="sidebar-logo logo-dark" width="100" height="22">
-        </a>
+        <div class="sidebar-brand-container">
+          <a href="/" class="sidebar-brand" title="HAMAL">
+            <img src="/static/brand/hamal-logo-light.svg" alt="HAMAL" class="sidebar-logo logo-light" width="112" height="25">
+            <img src="/static/brand/hamal-logo-dark.svg" alt="HAMAL" class="sidebar-logo logo-dark" width="112" height="25">
+          </a>
+          <span class="sidebar-brand-tagline">TRANSFER LOCALLY</span>
+        </div>
 
         <nav class="sidebar-nav">
           <button type="button" id="nav-btn-room" class="nav-item active">
-            <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-            <span>Transfer Room</span>
+            <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+              <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg>
+            <span class="nav-label">Transfer Room</span>
           </button>
-          <button type="button" id="nav-btn-files" class="nav-item" disabled style="opacity: 0.6; cursor: default;">
-            <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-            <span>Files</span>
-            <span id="nav-file-count" class="nav-pill">0</span>
+          <button type="button" id="nav-btn-files" class="nav-item" disabled>
+            <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <span class="nav-label">Files</span>
+            <span id="nav-file-count" class="nav-badge">0</span>
           </button>
           <button type="button" id="nav-btn-about" class="nav-item">
-            <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-            <span>About</span>
+            <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span class="nav-label">About</span>
           </button>
         </nav>
       </div>
 
       <div class="sidebar-bottom">
-        <div class="lan-status-badge">
-          <span class="status-dot"></span>
+        <div class="sidebar-lan-status">
+          <span class="status-indicator-dot"></span>
           <span>LAN Connected</span>
         </div>
 
-        <div class="sidebar-controls">
-          <div class="theme-toggle-group">
+        <div class="sidebar-footer-row">
+          <div class="theme-toggle-pill">
             <button type="button" class="theme-btn" id="theme-btn-light" title="Light Theme" aria-label="Light theme">
-              <svg width="14" height="14" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="4.22" x2="19.78" y2="5.64"></line></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="4.22" x2="19.78" y2="5.64"></line></svg>
             </button>
             <button type="button" class="theme-btn active" id="theme-btn-dark" title="Dark Theme" aria-label="Dark theme">
-              <svg width="14" height="14" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
             </button>
           </div>
-          <span id="sidebar-version" class="version-text">v0.8.9</span>
+          <span class="sidebar-version-tag">v0.8.10</span>
+          <button type="button" class="sidebar-settings-btn" id="nav-btn-settings" title="Settings" aria-label="Settings">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          </button>
         </div>
       </div>
     </aside>
 
     <!-- Main Viewport -->
-    <main class="main-viewport">
-      <div class="setup-container">
-        <!-- Hero Header -->
-        <section class="hero-box">
-          <div class="hero-visual" aria-hidden="true">
-            <img src="/static/brand/hamal-hero.svg" alt="" loading="eager">
+    <main class="main-viewport home-viewport">
+      <!-- Top Right Status Bar -->
+      <header class="home-top-bar">
+        <div class="top-status-pills">
+          <span class="status-privacy-tag">
+            <span class="status-dot-amber"></span>
+            Private <span class="bullet">•</span> Local <span class="bullet">•</span> Yours
+          </span>
+          <span class="status-divider"></span>
+          <span class="status-network-tag">
+            <svg class="network-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+              <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+              <line x1="12" y1="20" x2="12.01" y2="20"></line>
+            </svg>
+            LAN Connected
+          </span>
+        </div>
+      </header>
+
+      <div class="home-content-container">
+        <!-- Hero Section with Background Mountain Graphic and Handwritten Callout -->
+        <section class="home-hero-section">
+          <!-- Decorative Mountain Illustration -->
+          <div class="hero-decorative-backdrop" aria-hidden="true">
+            <svg class="mountain-vector" viewBox="0 0 760 260" fill="none" preserveAspectRatio="none">
+              <defs>
+                <radialGradient id="mountainGlow" cx="65%" cy="35%" r="65%">
+                  <stop offset="0%" stop-color="#FF7800" stop-opacity="0.30" />
+                  <stop offset="50%" stop-color="#FF7800" stop-opacity="0.08" />
+                  <stop offset="100%" stop-color="#FF7800" stop-opacity="0.0" />
+                </radialGradient>
+                <linearGradient id="peakGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#14110E" stop-opacity="0.95" />
+                  <stop offset="100%" stop-color="#0B0D0E" stop-opacity="0.2" />
+                </linearGradient>
+                <linearGradient id="peakGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#1A1510" stop-opacity="0.9" />
+                  <stop offset="100%" stop-color="#0B0D0E" stop-opacity="0.1" />
+                </linearGradient>
+              </defs>
+              <rect width="760" height="260" fill="url(#mountainGlow)" />
+              
+              <!-- Far Ridge -->
+              <path d="M60 260 L 160 170 L 260 130 L 370 70 L 460 110 L 580 45 L 680 95 L 760 65 L 760 260 Z" fill="url(#peakGrad1)" />
+              <path d="M60 260 L 160 170 L 260 130 L 370 70 L 460 110 L 580 45 L 680 95 L 760 65" stroke="#FF7800" stroke-width="1.2" stroke-opacity="0.35" stroke-dasharray="2 3" />
+              
+              <!-- Mid Ridge with glowing contour dots -->
+              <path d="M120 260 L 220 180 L 330 115 L 430 80 L 520 125 L 630 65 L 720 110 L 760 90 L 760 260 Z" fill="url(#peakGrad2)" />
+              <path d="M120 260 L 220 180 L 330 115 L 430 80 L 520 125 L 630 65 L 720 110 L 760 90" stroke="#FF8A00" stroke-width="1.8" stroke-opacity="0.55" />
+              
+              <!-- Wireframe mesh lines -->
+              <path d="M220 180 Q 280 145 330 115 Q 380 95 430 80 Q 480 100 520 125 Q 580 90 630 65 Q 680 85 720 110" stroke="#FF7800" stroke-width="0.9" stroke-opacity="0.4" stroke-dasharray="1 3" />
+              <path d="M260 210 Q 340 160 410 130 Q 480 120 540 145 Q 610 120 670 115 Q 720 135 760 130" stroke="#FF7800" stroke-width="1" stroke-opacity="0.3" stroke-dasharray="2 4" />
+              <path d="M300 240 Q 390 195 480 170 Q 560 165 630 170 Q 690 160 760 165" stroke="#FF7800" stroke-width="0.8" stroke-opacity="0.25" stroke-dasharray="1 2" />
+            </svg>
           </div>
-          <div class="hero-badge">
-            <span class="status-dot" style="background: var(--accent-amber); box-shadow: 0 0 6px var(--accent-amber);"></span>
-            <span>PRIVATE LOCAL NETWORK COURIER</span>
+
+          <!-- Handwritten Decorative Callout -->
+          <div class="hero-callout-badge" aria-hidden="true">
+            <div class="handwritten-text">
+              <span>Share</span>
+              <span>Without</span>
+              <span>Limits.</span>
+              <svg class="handwritten-underline" width="60" height="12" viewBox="0 0 60 12" fill="none">
+                <path d="M2 3C16 2 40 1 58 4" stroke="#FF7800" stroke-width="2.2" stroke-linecap="round"/>
+                <path d="M6 9C22 8 42 7 54 10" stroke="#FF7800" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </div>
           </div>
-          <h1 class="hero-title">Point-to-point local file transfer.</h1>
-          <p class="hero-lead">
-            Spin up an ephemeral transfer room on your local network. Share documents, media, and large packages directly between phones, tablets, and computers with zero cloud storage and automatic destruction.
-          </p>
+
+          <div class="hero-content">
+            <div class="hero-eyebrow">CREATE A ROOM</div>
+            <h1 class="hero-headline">
+              <span class="headline-white">Temporary room.</span>
+              <span class="headline-orange">Instant transfer.</span>
+            </h1>
+            <p class="hero-description">
+              Create a secure, temporary room on your local network. Share files and text<br class="hero-br">
+              between your devices with a simple QR code.
+            </p>
+          </div>
         </section>
 
-        <!-- Create Room Instrument Panel -->
-        <section class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">
-              <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-              <span>Create Temporary Room</span>
-            </h2>
-            <p class="panel-subtitle">Set lifespan and optional PIN code. A dispatch dashboard and QR code will be generated.</p>
+        <!-- Primary Functional Card: Room Settings -->
+        <section class="room-settings-card">
+          <div class="card-header">
+            <div class="card-icon-box">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+              </svg>
+            </div>
+            <div class="card-title-group">
+              <h2 class="card-heading">Room Settings</h2>
+              <p class="card-subheading">Set a lifespan and an optional PIN code. A dashboard and QR code will be generated for you.</p>
+            </div>
           </div>
 
-          <form id="create-room-form" method="POST" action="/api/v1/rooms">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="ttl-select" class="form-label">ROOM LIFESPAN (TTL)</label>
-                <select id="ttl-select" name="ttl_seconds" class="form-select">
-                  <option value="300">5 Minutes</option>
-                  <option value="900">15 Minutes</option>
-                  <option value="1800">30 Minutes</option>
-                  <option value="3600" selected>1 Hour (Recommended)</option>
-                  <option value="21600">6 Hours</option>
-                  <option value="43200">12 Hours</option>
-                  <option value="86400">24 Hours (Maximum)</option>
-                </select>
-                <span class="form-hint">Room and all uploaded files will be permanently purged when expired.</span>
+          <form id="create-room-form" method="POST" action="/api/v1/rooms" class="room-form">
+            <div class="form-columns-grid">
+              <!-- Left Column: TTL Field -->
+              <div class="form-column">
+                <label for="ttl-select" class="field-label">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                  <span>Room Lifespan (TTL)</span>
+                </label>
+                <div class="custom-select-wrapper">
+                  <select id="ttl-select" name="ttl_seconds" class="field-select">
+                    <option value="300">5 Minutes</option>
+                    <option value="900">15 Minutes</option>
+                    <option value="1800">30 Minutes</option>
+                    <option value="3600" selected>1 Hour (Recommended)</option>
+                    <option value="21600">6 Hours</option>
+                    <option value="43200">12 Hours</option>
+                    <option value="86400">24 Hours (Maximum)</option>
+                  </select>
+                  <svg class="select-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </div>
+                <p class="field-hint">
+                  Room and all uploaded files will be permanently deleted<br>
+                  when expired.
+                </p>
               </div>
 
-              <div class="form-group">
-                <label for="pin-input" class="form-label">PARTICIPANT PIN (OPTIONAL)</label>
-                <input type="text" id="pin-input" name="pin" maxlength="8" placeholder="4–8 digits or characters" autocomplete="off" class="form-input font-mono">
-                <span class="form-hint">If specified, participants must enter this PIN before viewing or downloading files.</span>
+              <!-- Vertical Column Divider -->
+              <div class="form-columns-divider" aria-hidden="true"></div>
+
+              <!-- Right Column: PIN Field -->
+              <div class="form-column">
+                <label for="pin-input" class="field-label">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                  <span>Participant PIN (Optional)</span>
+                </label>
+                <div class="field-input-wrapper">
+                  <input type="password" id="pin-input" name="pin" maxlength="8" placeholder="4–8 digits or characters" autocomplete="off" class="field-input font-mono">
+                  <button type="button" id="pin-toggle-btn" class="input-action-btn" title="Toggle PIN visibility" aria-label="Toggle PIN visibility">
+                    <svg id="pin-eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  </button>
+                </div>
+                <p class="field-hint">
+                  If specified, participants must enter this PIN before viewing<br>
+                  or downloading files.
+                </p>
               </div>
             </div>
 
-            <div id="form-error" class="form-hint" style="color: var(--accent-danger); display: none; margin-bottom: 12px;"></div>
+            <div id="form-error" class="form-error-banner" style="display: none;"></div>
 
-            <div class="form-actions">
-              <button type="submit" id="create-submit-btn" class="btn btn-primary">
-                <span>Create Transfer Room</span>
-                <span>→</span>
-              </button>
-            </div>
+            <!-- Primary CTA Button -->
+            <button type="submit" id="create-submit-btn" class="btn-create-room">
+              <span class="btn-icon-circle">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+              </span>
+              <span class="btn-text">Create Transfer Room</span>
+              <svg class="btn-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </button>
           </form>
         </section>
 
-        <!-- 6 Technical Specs / Feature Tiles -->
-        <section class="specs-grid">
-          <div class="spec-tile">
-            <div class="spec-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        <!-- Feature Cards (6 Columns) -->
+        <section class="feature-cards-grid">
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
             </div>
-            <div class="spec-title">Full LAN Speed</div>
-            <div class="spec-desc">Local network only</div>
+            <h3 class="feature-title">Full LAN Speed</h3>
+            <p class="feature-desc">Local network only</p>
           </div>
-          <div class="spec-tile">
-            <div class="spec-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              </svg>
             </div>
-            <div class="spec-title">Isolated Tokens</div>
-            <div class="spec-desc">Your room, your rules</div>
+            <h3 class="feature-title">Isolated Rooms</h3>
+            <p class="feature-desc">Your room, your rules</p>
           </div>
-          <div class="spec-tile">
-            <div class="spec-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
             </div>
-            <div class="spec-title">Auto-Expiring</div>
-            <div class="spec-desc">Built-in TTL protection</div>
+            <h3 class="feature-title">Auto-Expiring</h3>
+            <p class="feature-desc">Built-in TTL protection</p>
           </div>
-          <div class="spec-tile">
-            <div class="spec-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><rect x="7" y="7" width="3" height="3"></rect><rect x="14" y="7" width="3" height="3"></rect><rect x="7" y="14" width="3" height="3"></rect></svg>
+
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+                <rect x="14" y="14" width="3" height="3"></rect>
+                <rect x="18" y="18" width="3" height="3"></rect>
+              </svg>
             </div>
-            <div class="spec-title">Instant QR Join</div>
-            <div class="spec-desc">Scan and connect</div>
+            <h3 class="feature-title">Instant QR Join</h3>
+            <p class="feature-desc">Scan and connect</p>
           </div>
-          <div class="spec-tile">
-            <div class="spec-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>
+
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+              </svg>
             </div>
-            <div class="spec-title">No Cloud</div>
-            <div class="spec-desc">No uploads, no trace</div>
+            <h3 class="feature-title">No Cloud</h3>
+            <p class="feature-desc">No uploads, no trace</p>
           </div>
-          <div class="spec-tile">
-            <div class="spec-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
             </div>
-            <div class="spec-title">Secure by Design</div>
-            <div class="spec-desc">Private by default</div>
+            <h3 class="feature-title">Secure by Design</h3>
+            <p class="feature-desc">Private by default</p>
           </div>
         </section>
       </div>
@@ -197,7 +357,7 @@
       <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span class="font-mono" style="font-size: 12px; color: var(--accent-amber);">FAST · PRIVATE · TEMPORARY · LOCAL</span>
-          <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">v0.8.9</span>
+          <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">v0.8.10</span>
         </div>
         <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
           HAMAL is a quiet, precise digital courier designed to move files point-to-point on your local network without cloud storage, accounts, or telemetry.

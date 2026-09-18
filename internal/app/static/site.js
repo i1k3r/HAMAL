@@ -4,8 +4,7 @@
   // --------------------------------------------------------------------------
   function initTheme() {
     const saved = localStorage.getItem('hamal_theme');
-    const prefDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const currentTheme = saved || (prefDark ? 'dark' : 'light');
+    const currentTheme = saved || 'dark';
 
     document.documentElement.setAttribute('data-theme', currentTheme);
     updateThemeButtons(currentTheme);
@@ -152,10 +151,47 @@
         }
         if (createBtn) {
           createBtn.disabled = false;
-          createBtn.innerHTML = '<span>Create Transfer Room</span> <span>→</span>';
+          createBtn.innerHTML = `
+            <span class="btn-icon-circle">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </span>
+            <span class="btn-text">Create Transfer Room</span>
+            <svg class="btn-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          `;
         }
       }
     });
+
+    const pinToggleBtn = document.getElementById('pin-toggle-btn');
+    const pinInput = document.getElementById('pin-input');
+    const pinEyeIcon = document.getElementById('pin-eye-icon');
+    if (pinToggleBtn && pinInput) {
+      pinToggleBtn.addEventListener('click', () => {
+        const isPassword = pinInput.getAttribute('type') === 'password';
+        pinInput.setAttribute('type', isPassword ? 'text' : 'password');
+        if (pinEyeIcon) {
+          if (isPassword) {
+            // Show eye-off icon
+            pinEyeIcon.innerHTML = `
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+              <line x1="1" y1="1" x2="23" y2="23"></line>
+            `;
+          } else {
+            // Show eye icon
+            pinEyeIcon.innerHTML = `
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            `;
+          }
+        }
+      });
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -936,6 +972,82 @@
       }
     }
 
+    let closingTimer = null;
+    function startClosingCountdown(remainingSec) {
+      const activeCard = document.getElementById('room-active-card');
+      const closingCard = document.getElementById('room-closing-card');
+      const pinCard = document.getElementById('pin-barrier-card') || document.getElementById('room-pin-card');
+      const sidebar = document.querySelector('.sidebar');
+      const mainViewport = document.querySelector('.main-viewport');
+
+      if (activeCard) {
+        activeCard.classList.add('hidden');
+        activeCard.style.display = 'none';
+      }
+      if (pinCard) {
+        pinCard.classList.add('hidden');
+        pinCard.style.display = 'none';
+      }
+      if (sidebar) {
+        sidebar.style.display = 'none';
+      }
+      if (mainViewport) {
+        mainViewport.style.padding = '0';
+        mainViewport.style.maxWidth = '100%';
+        mainViewport.style.margin = '0';
+        mainViewport.style.width = '100%';
+      }
+      if (closingCard) {
+        closingCard.classList.remove('hidden');
+        closingCard.style.display = 'flex';
+      }
+
+      let currentSec = typeof remainingSec === 'number' ? Math.max(0, Math.floor(remainingSec)) : 10;
+      const totalSec = 10;
+      const circumference = 2 * Math.PI * 72; // ~452.389
+
+      const ringFill = document.getElementById('closing-ring-fill');
+      const countdownNum = document.getElementById('closing-countdown');
+
+      function updateRing(sec) {
+        if (countdownNum) {
+          countdownNum.textContent = String(sec);
+        }
+        if (ringFill) {
+          const ratio = Math.max(0, Math.min(1, (totalSec - sec) / totalSec));
+          const offset = circumference * ratio;
+          ringFill.style.strokeDashoffset = String(offset);
+        }
+      }
+
+      updateRing(currentSec);
+
+      if (closingTimer) clearInterval(closingTimer);
+      closingTimer = setInterval(() => {
+        currentSec--;
+        if (currentSec <= 0) {
+          clearInterval(closingTimer);
+          updateRing(0);
+          showInactive('Room Closed', 'This temporary transfer room has been closed.');
+        } else {
+          updateRing(currentSec);
+        }
+      }, 1000);
+    }
+
+    const cancelCloseBtn = document.getElementById('cancel-closing-btn');
+    if (cancelCloseBtn) {
+      cancelCloseBtn.addEventListener('click', () => {
+        window.location.reload();
+      });
+    }
+
+    const initialStatus = document.body.dataset.status;
+    const initialClosingSec = parseInt(document.body.dataset.closingSeconds || '10', 10);
+    if (initialStatus === 'closing') {
+      startClosingCountdown(initialClosingSec);
+    }
+
     // Countdown loop
     function updateCountdown() {
       if (isTerminated) return;
@@ -979,8 +1091,12 @@
 
       if (recentActivities.length === 0) {
         activityList.innerHTML = `
-          <div style="padding: 12px; font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); text-align: center;">
-            No transfer activity yet
+          <div class="panel-empty-state">
+            <div class="empty-icon-circle">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            </div>
+            <div class="empty-title">No transfer activity yet</div>
+            <div class="empty-sub">Files and text you share will appear here</div>
           </div>
         `;
         return;
@@ -1028,63 +1144,130 @@
       });
     }
 
+    const clearActBtn = document.getElementById('btn-clear-activity');
+    if (clearActBtn) {
+      clearActBtn.addEventListener('click', () => {
+        recentActivities.length = 0;
+        renderActivityList();
+      });
+    }
+
     // --------------------------------------------------------------------------
     // Connected Participants (Authoritative Backend State)
     // --------------------------------------------------------------------------
+    function getDeviceIconSVG(name) {
+      const n = (name || '').toLowerCase();
+      if (n.includes('win') || (!n && page === 'creator')) {
+        return `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.951-1.898"/></svg>`;
+      }
+      if (n.includes('mac') || n.includes('iphone') || n.includes('ipad') || n.includes('apple')) {
+        return `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.84c.62-.75 1.04-1.8 0.92-2.84-.9.04-2 0.6-2.65 1.34-.56.63-1.05 1.68-.92 2.7 1.01.08 2.03-.45 2.65-1.2"/></svg>`;
+      }
+      if (n.includes('android')) {
+        return `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.551 0 .9993.4482.9993.9993.0001.5511-.4483.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4482.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.4116 13.8533 8.0833 12 8.0833s-3.5902.3283-5.1367.8664L4.841 5.4467a.4161.4161 0 00-.5677-.1521.4157.4157 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3432-4.1021-2.6889-7.5743-6.1185-9.4396"/></svg>`;
+      }
+      return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>`;
+    }
+
     function renderParticipantList(participants, authoritativeCount) {
       const list = document.getElementById('participant-list');
       const countBadge = document.getElementById('participant-count');
       const metricCount = document.getElementById('metric-connected-count');
       if (!list) return;
 
-      const count = typeof authoritativeCount === 'number' ? authoritativeCount : (participants ? participants.length : 0);
-      if (countBadge) countBadge.textContent = String(count);
-      if (metricCount) metricCount.textContent = String(count);
-
-      if (!participants || participants.length === 0) {
-        list.innerHTML = `
-          <div style="padding: 12px; font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); text-align: center;">
-            Waiting for devices to scan and connect…
-          </div>
-        `;
-        return;
-      }
+      const remoteCount = participants ? participants.length : 0;
+      const totalCount = page === 'creator' ? Math.max(1, remoteCount + 1) : (typeof authoritativeCount === 'number' ? authoritativeCount : remoteCount);
+      if (countBadge) countBadge.textContent = String(totalCount);
+      if (metricCount) metricCount.textContent = String(totalCount);
 
       list.innerHTML = '';
-      participants.forEach((p) => {
-        const row = document.createElement('div');
-        row.className = 'participant-row';
 
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'participant-info';
+      // If creator page, always show Host ("You")
+      if (page === 'creator') {
+        const hostRow = document.createElement('div');
+        hostRow.className = 'participant-row';
+        hostRow.innerHTML = `
+          <div class="participant-info">
+            <div class="participant-icon">
+              ${getDeviceIconSVG(navigator.userAgent || 'Windows')}
+            </div>
+            <div class="participant-details">
+              <div class="participant-name-row">
+                <span class="participant-name">Windows Device</span>
+                <span class="participant-badge-you">You</span>
+              </div>
+              <span class="participant-ip">${window.location.hostname || '192.168.68.55'}</span>
+            </div>
+          </div>
+          <div class="participant-status-wrap">
+            <span class="participant-status-active">
+              <span class="status-indicator-dot green"></span> Active
+            </span>
+            <button type="button" class="participant-options-btn" title="Options" aria-label="Device options">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle><circle cx="5" cy="12" r="2"></circle></svg>
+            </button>
+          </div>
+        `;
+        list.appendChild(hostRow);
+      }
 
-        const iconDiv = document.createElement('div');
-        iconDiv.className = 'participant-icon';
-        iconDiv.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>`;
+      if (participants && participants.length > 0) {
+        participants.forEach((p) => {
+          const row = document.createElement('div');
+          row.className = 'participant-row';
 
-        const detailsDiv = document.createElement('div');
-        detailsDiv.className = 'participant-details';
+          const infoDiv = document.createElement('div');
+          infoDiv.className = 'participant-info';
 
-        const nameSpan = document.createElement('span');
-        nameSpan.className = 'participant-name';
-        nameSpan.textContent = p.name || 'Mobile Device';
+          const iconDiv = document.createElement('div');
+          iconDiv.className = 'participant-icon';
+          iconDiv.innerHTML = getDeviceIconSVG(p.name || '');
 
-        const ipSpan = document.createElement('span');
-        ipSpan.className = 'participant-ip';
-        ipSpan.textContent = p.ip || 'LAN Peer';
+          const detailsDiv = document.createElement('div');
+          detailsDiv.className = 'participant-details';
 
-        detailsDiv.appendChild(nameSpan);
-        detailsDiv.appendChild(ipSpan);
-        infoDiv.appendChild(iconDiv);
-        infoDiv.appendChild(detailsDiv);
+          const nameRow = document.createElement('div');
+          nameRow.className = 'participant-name-row';
 
-        const statusSpan = document.createElement('span');
-        statusSpan.className = 'participant-status';
-        statusSpan.innerHTML = `<span class="status-dot"></span> Active`;
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'participant-name';
+          nameSpan.textContent = p.name || 'Mobile Device';
+          nameRow.appendChild(nameSpan);
 
-        row.appendChild(infoDiv);
-        row.appendChild(statusSpan);
-        list.appendChild(row);
+          const ipSpan = document.createElement('span');
+          ipSpan.className = 'participant-ip font-mono';
+          ipSpan.textContent = p.ip || 'LAN Peer';
+
+          detailsDiv.appendChild(nameRow);
+          detailsDiv.appendChild(ipSpan);
+          infoDiv.appendChild(iconDiv);
+          infoDiv.appendChild(detailsDiv);
+
+          const statusWrap = document.createElement('div');
+          statusWrap.className = 'participant-status-wrap';
+          statusWrap.innerHTML = `
+            <span class="participant-status-active">
+              <span class="status-indicator-dot green"></span> Active
+            </span>
+            <button type="button" class="participant-options-btn" title="Options" aria-label="Device options">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle><circle cx="5" cy="12" r="2"></circle></svg>
+            </button>
+          `;
+
+          row.appendChild(infoDiv);
+          row.appendChild(statusWrap);
+          list.appendChild(row);
+        });
+      }
+    }
+
+    const copyAllPartBtn = document.getElementById('btn-copy-all-participants');
+    if (copyAllPartBtn) {
+      copyAllPartBtn.addEventListener('click', async () => {
+        const list = document.getElementById('participant-list');
+        if (!list) return;
+        const text = list.innerText || '';
+        await copyTextToClipboard(text, copyAllPartBtn);
       });
     }
 
@@ -1114,9 +1297,12 @@
 
       if (count === 0) {
         fileListEl.innerHTML = `
-          <div id="no-files-msg" class="empty-state-box">
-            <p class="empty-state-title">Nothing here yet.</p>
-            <p class="empty-state-lead">Waiting for files. Drag files above or send parcels from your phone.</p>
+          <div class="panel-empty-state large-empty">
+            <div class="empty-folder-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="1.6"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            </div>
+            <div class="empty-title large-title">Nothing here yet.</div>
+            <div class="empty-sub">Waiting for files. Drag files from your device or use the upload area.</div>
           </div>
         `;
         return;
@@ -1222,7 +1408,15 @@
         sid = sessionStorage.getItem(key) || '';
       } catch (_) {}
       if (!sid) {
-        sid = 'cs_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+          sid = 'cs_' + crypto.randomUUID().replace(/-/g, '');
+        } else if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+          const arr = new Uint8Array(16);
+          crypto.getRandomValues(arr);
+          sid = 'cs_' + Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
+        } else {
+          sid = 'cs_' + Date.now().toString(36);
+        }
         try {
           sessionStorage.setItem(key, sid);
         } catch (_) {}
@@ -1286,9 +1480,9 @@
 
       if (count === 0) {
         textListEl.innerHTML = `
-          <div id="no-texts-msg" class="empty-state-box empty-state empty-state-wrap">
-            <p class="empty-state-title" id="no-texts-title">${t.noTextsYet || 'No shared text yet.'}</p>
-            <p class="empty-state-lead empty-state-text" id="no-texts-desc">${t.noTextsSub || 'Type or paste text above to share with the room.'}</p>
+          <div class="panel-empty-state">
+            <div class="empty-title" id="no-texts-title">${t.noTextsYet || 'No text messages yet.'}</div>
+            <div class="empty-sub" id="no-texts-desc">${t.noTextsSub || 'Paste commands, logs, snippets, or URLs to share directly.'}</div>
           </div>
         `;
         return;
@@ -1422,22 +1616,7 @@
             showInactive('Room Expired', 'This temporary room has expired.');
             return;
           } else if (data.status === 'closing') {
-            const closingCard = document.getElementById('room-closing-card');
-            const statusCard = document.querySelector('.room-status-card');
-            const dropzoneCard = document.querySelector('.dropzone-card');
-            const filesSec = document.querySelector('.files-section');
-            const actionsSec = document.querySelector('.participant-bottom-actions');
-
-            if (closingCard) closingCard.style.display = 'block';
-            if (statusCard) statusCard.style.display = 'none';
-            if (dropzoneCard) dropzoneCard.style.display = 'none';
-            if (filesSec) filesSec.style.display = 'none';
-            if (actionsSec) actionsSec.style.display = 'none';
-
-            const countdownEl = document.getElementById('closing-countdown');
-            if (countdownEl && data.closing_remaining_seconds !== undefined) {
-              countdownEl.textContent = String(data.closing_remaining_seconds);
-            }
+            startClosingCountdown(data.closing_remaining_seconds);
             if (data.closing_remaining_seconds <= 0) {
               showInactive('Room Closed', 'This temporary room is no longer accessible.');
               return;
@@ -1456,7 +1635,7 @@
               activeCard.classList.add('hidden');
               activeCard.style.display = 'none';
             }
-          } else if (page === 'participant') {
+          } else if (page === 'participant' && data.status !== 'closing') {
             if (pinCard) {
               pinCard.classList.add('hidden');
               pinCard.style.display = 'none';
@@ -1543,58 +1722,47 @@
     function processNextUpload() {
       if (uploadQueue.length === 0) {
         isUploading = false;
-        if (!uploadError || uploadError.style.display === 'none') {
-          setTimeout(() => {
-            if (progressContainer && (!uploadError || uploadError.style.display === 'none')) {
-              progressContainer.style.display = 'none';
-            }
-          }, 1500);
-        }
+        if (progressContainer) progressContainer.style.display = 'none';
         return;
       }
-
       isUploading = true;
       const file = uploadQueue.shift();
+      uploadSingleFile(file);
+    }
 
+    function uploadSingleFile(file) {
       if (progressContainer) progressContainer.style.display = 'block';
-      if (uploadError) uploadError.style.display = 'none';
       if (progressFilename) progressFilename.textContent = file.name;
       if (progressPercent) progressPercent.textContent = '0%';
-      if (progressFill) {
-        progressFill.style.width = '0%';
-        progressFill.style.backgroundColor = 'var(--accent-amber)';
-      }
-
-      const formData = new FormData();
-      formData.append('file', file);
+      if (progressFill) progressFill.style.width = '0%';
+      if (uploadError) uploadError.style.display = 'none';
 
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `/api/v1/rooms/${encodeURIComponent(token)}/files`, true);
+      xhr.open('POST', `/api/v1/rooms/${encodeURIComponent(token)}/files?filename=${encodeURIComponent(file.name)}`);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.setRequestHeader('X-Client-Session-ID', getClientSessionId());
 
-      xhr.upload.onprogress = (e) => {
+      xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
           const percent = Math.round((e.loaded / e.total) * 100);
           if (progressPercent) progressPercent.textContent = `${percent}%`;
           if (progressFill) progressFill.style.width = `${percent}%`;
         }
-      };
+      });
 
-      xhr.onload = () => {
-        if (xhr.status === 201) {
-          if (progressPercent) progressPercent.textContent = '100%';
-          if (progressFill) progressFill.style.width = '100%';
-          addRecentActivity('upload', file.name, page === 'creator' ? 'Uploaded by Creator' : 'Uploaded by Participant');
-          pollStatus();
-          setTimeout(processNextUpload, 300);
-        } else {
-          let errMsg = 'Upload failed';
+      xhr.addEventListener('load', () => {
+        if (xhr.status === 201 || xhr.status === 200) {
           try {
             const data = JSON.parse(xhr.responseText);
-            if (data.error) errMsg = data.error;
-          } catch (_) {}
-          showUploadError(`${file.name}: ${errMsg}`);
+            addRecentActivity('upload', file.name, formatBytes(file.size));
+            if (data.file) {
+              // Immediately fetch updated file list
+              fetch(`/api/v1/rooms/${encodeURIComponent(token)}/files`, { cache: 'no-store' })
+                .then((r) => r.json())
+                .then((fData) => renderFileList(fData.files || []));
+            }
+          } catch (e) {}
           processNextUpload();
-        }
       };
 
       xhr.onerror = () => {
@@ -1734,7 +1902,14 @@
             method: 'POST',
           });
           closeAllModals();
-          if (res.ok || res.status === 404 || res.status === 410) {
+          if (res.ok) {
+            const data = await res.json().catch(() => ({}));
+            if (data.status === 'closing') {
+              startClosingCountdown(data.closing_remaining_seconds);
+            } else {
+              showInactive('Room Closed', 'This temporary transfer room has been closed and all files purged.');
+            }
+          } else if (res.status === 404 || res.status === 410) {
             showInactive('Room Closed', 'This temporary transfer room has been closed and all files purged.');
           } else {
             const errData = await res.json().catch(() => ({}));
@@ -1793,33 +1968,7 @@
             if (res.ok) {
               const data = await res.json().catch(() => ({}));
               if (data.status === 'closing') {
-                const closingCard = document.getElementById('room-closing-card');
-                const statusCard = document.querySelector('.room-status-card');
-                const dropzoneCard = document.querySelector('.dropzone-card');
-                const filesSec = document.querySelector('.files-section');
-                const actionsSec = document.querySelector('.participant-bottom-actions');
-
-                if (closingCard) closingCard.style.display = 'block';
-                if (statusCard) statusCard.style.display = 'none';
-                if (dropzoneCard) dropzoneCard.style.display = 'none';
-                if (filesSec) filesSec.style.display = 'none';
-                if (actionsSec) actionsSec.style.display = 'none';
-
-                let count = data.closing_remaining_seconds || 10;
-                const countdownEl = document.getElementById('closing-countdown');
-                const ringFill = document.getElementById('closing-ring-fill');
-                const timer = setInterval(() => {
-                  count--;
-                  if (countdownEl) countdownEl.textContent = String(Math.max(0, count));
-                  if (ringFill) {
-                    const offset = 364 - (364 * (10 - count)) / 10;
-                    ringFill.style.strokeDashoffset = String(offset);
-                  }
-                  if (count <= 0) {
-                    clearInterval(timer);
-                    showInactive('Room Closed', 'This temporary room is no longer accessible.');
-                  }
-                }, 1000);
+                startClosingCountdown(data.closing_remaining_seconds);
               } else {
                 showInactive('Room Closed', 'This temporary room is no longer accessible.');
               }
@@ -1930,14 +2079,60 @@
     }
 
     // --------------------------------------------------------------------------
-    // Participant PIN Authentication Form
+    // Participant PIN Authentication Form & 8-Slot Coordinator
     // --------------------------------------------------------------------------
     const pinForm = document.getElementById('pin-form');
     const pinInput = document.getElementById('participant-pin-input');
+    const pinSlotsWrapper = document.getElementById('pin-slots-wrapper') || document.querySelector('.pin-slots-wrapper');
+    const pinSlots = document.querySelectorAll('.pin-slot');
     const unlockBtn = document.getElementById('unlock-btn');
+    const unlockBtnText = document.getElementById('unlock-btn-text');
     const pinError = document.getElementById('pin-error');
+    const pinErrorText = document.getElementById('pin-error-text');
     const pinCooldown = document.getElementById('pin-cooldown');
     const pinCooldownText = document.getElementById('pin-cooldown-text');
+
+    function syncPinSlots() {
+      if (!pinInput || !pinSlots.length) return;
+      const val = pinInput.value;
+      const len = val.length;
+      const isFocused = document.activeElement === pinInput || document.activeElement === pinSlotsWrapper;
+
+      pinSlots.forEach((slot, idx) => {
+        slot.classList.remove('active', 'filled');
+        if (idx < len) {
+          slot.classList.add('filled');
+          slot.innerHTML = `<span class="pin-dot-filled">•</span>`;
+        } else if (idx === len && isFocused) {
+          slot.classList.add('active');
+          slot.innerHTML = `<span class="pin-caret"></span>`;
+        } else {
+          slot.innerHTML = `<span class="pin-dot">•</span>`;
+        }
+      });
+    }
+
+    if (pinSlotsWrapper && pinInput) {
+      pinSlotsWrapper.addEventListener('click', () => {
+        pinInput.focus();
+      });
+      pinInput.addEventListener('input', () => {
+        syncPinSlots();
+      });
+      pinInput.addEventListener('focus', syncPinSlots);
+      pinInput.addEventListener('blur', syncPinSlots);
+      pinInput.addEventListener('keyup', (e) => {
+        syncPinSlots();
+      });
+
+      syncPinSlots();
+      if (pinCard && pinCard.style.display !== 'none') {
+        setTimeout(() => {
+          pinInput.focus();
+          syncPinSlots();
+        }, 150);
+      }
+    }
 
     if (pinForm) {
       pinForm.addEventListener('submit', async (e) => {
@@ -1947,11 +2142,15 @@
 
         if (unlockBtn) {
           unlockBtn.disabled = true;
-          unlockBtn.textContent = 'Verifying…';
+          if (unlockBtnText) {
+            unlockBtnText.textContent = 'Verifying…';
+          } else {
+            unlockBtn.textContent = 'Verifying…';
+          }
         }
         if (pinError) {
           pinError.style.display = 'none';
-          pinError.textContent = '';
+          if (pinErrorText) pinErrorText.textContent = '';
         }
 
         try {
@@ -1971,7 +2170,7 @@
               pinCard.classList.add('hidden');
             }
             if (activeCard) {
-              activeCard.style.display = 'block';
+              activeCard.style.display = 'flex';
               activeCard.classList.remove('hidden');
             }
             // Trigger immediate room and files polling
@@ -1990,7 +2189,7 @@
               if (pinInput) pinInput.disabled = true;
               if (unlockBtn) {
                 unlockBtn.disabled = true;
-                unlockBtn.textContent = 'Locked Out';
+                if (unlockBtnText) unlockBtnText.textContent = 'Locked Out';
               }
               let rem = retryAfter;
               const cdTimer = setInterval(() => {
@@ -2004,41 +2203,52 @@
                   if (pinInput) {
                     pinInput.disabled = false;
                     pinInput.value = '';
+                    syncPinSlots();
                     pinInput.focus();
                   }
                   if (unlockBtn) {
                     unlockBtn.disabled = false;
-                    unlockBtn.textContent = 'Unlock Room';
+                    if (unlockBtnText) unlockBtnText.textContent = 'Join Room';
                   }
                 }
               }, 1000);
             } else {
               if (pinError) {
-                let msg = data.error || 'Incorrect PIN';
+                let msg = data.error || 'Incorrect PIN. Please try again.';
                 if (data.remaining_attempts !== undefined) {
                   msg += ` (${data.remaining_attempts} attempts remaining)`;
                 }
-                pinError.textContent = msg;
-                pinError.style.display = 'block';
+                if (pinErrorText) {
+                  pinErrorText.textContent = msg;
+                } else {
+                  pinError.textContent = msg;
+                }
+                pinError.style.display = 'flex';
               }
               if (unlockBtn) {
                 unlockBtn.disabled = false;
-                unlockBtn.textContent = 'Unlock Room';
+                if (unlockBtnText) unlockBtnText.textContent = 'Join Room';
               }
               if (pinInput) {
                 pinInput.value = '';
+                syncPinSlots();
                 pinInput.focus();
               }
             }
           }
         } catch (err) {
           if (pinError) {
-            pinError.textContent = 'Network error. Please try again.';
-            pinError.style.display = 'block';
+            const errMsg = 'Network error. Please try again.';
+            if (pinErrorText) {
+              pinErrorText.textContent = errMsg;
+            } else {
+              pinError.textContent = errMsg;
+            }
+            pinError.style.display = 'flex';
           }
           if (unlockBtn) {
             unlockBtn.disabled = false;
-            unlockBtn.textContent = 'Unlock Room';
+            if (unlockBtnText) unlockBtnText.textContent = 'Join Room';
           }
         }
       });

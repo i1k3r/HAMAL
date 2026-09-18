@@ -5,242 +5,372 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#0B0D0F" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#0B0D0E" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#F7F8FA" media="(prefers-color-scheme: light)">
-  <title>HAMAL · Transfer Room</title>
+  <title>HAMAL · Active Transfer Room</title>
   <link rel="icon" type="image/svg+xml" href="/static/brand/hamal-app-icon.svg">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/static/brand/hamal-app-icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/site.css">
   <script>
     (function() {
       var saved = localStorage.getItem('hamal_theme');
-      var prefDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      var theme = saved || (prefDark ? 'dark' : 'light');
+      var theme = saved || 'dark';
       document.documentElement.setAttribute('data-theme', theme);
     })();
   </script>
   <script defer src="/static/site.js"></script>
 </head>
-<body data-page="creator" data-role="CREATOR" data-token="{{.CreatorToken}}" data-expires="{{.ExpiresAtRFC3339}}" data-participant-token="{{.ParticipantToken}}" data-global-share-enabled="{{.GlobalShareEnabled}}" data-pin-required="{{.PinRequired}}">
+<body data-page="creator" data-role="CREATOR" data-token="{{.CreatorToken}}" data-expires="{{.ExpiresAtRFC3339}}" data-status="{{.Status}}" data-closing-seconds="{{.ClosingRemainingSeconds}}" data-participant-token="{{.ParticipantToken}}" data-global-share-enabled="{{.GlobalShareEnabled}}" data-pin-required="{{.PinRequired}}">
   <div class="app-container">
     <!-- Persistent Left Navigation Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar" style="{{if eq .Status "closing"}}display: none;{{end}}">
       <div class="sidebar-top">
-        <a href="/" class="sidebar-brand" title="HAMAL">
-          <img src="/static/brand/hamal-logo-light.svg" alt="HAMAL" class="sidebar-logo logo-light" width="100" height="22">
-          <img src="/static/brand/hamal-logo-dark.svg" alt="HAMAL" class="sidebar-logo logo-dark" width="100" height="22">
-          <span class="header-tag" style="display: none;">CREATOR DISPATCH</span>
-        </a>
+        <div class="sidebar-brand-container">
+          <a href="/" class="sidebar-brand" title="HAMAL">
+            <img src="/static/brand/hamal-logo-light.svg" alt="HAMAL" class="sidebar-logo logo-light" width="112" height="25">
+            <img src="/static/brand/hamal-logo-dark.svg" alt="HAMAL" class="sidebar-logo logo-dark" width="112" height="25">
+          </a>
+          <span class="sidebar-brand-tagline">TRANSFER LOCALLY</span>
+        </div>
 
         <nav class="sidebar-nav">
           <button type="button" id="nav-btn-room" class="nav-item active">
-            <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-            <span>Transfer Room</span>
+            <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+              <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg>
+            <span class="nav-label">Transfer Room</span>
           </button>
           <button type="button" id="nav-btn-files" class="nav-item">
-            <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-            <span>Files</span>
-            <span id="nav-file-count" class="nav-pill">{{len .Files}}</span>
+            <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <span class="nav-label">Files</span>
+            <span id="nav-file-count" class="nav-badge">{{len .Files}}</span>
           </button>
           <button type="button" id="nav-btn-texts" class="nav-item">
-            <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            <span>Text</span>
-            <span id="nav-text-count" class="nav-pill">{{len .Texts}}</span>
+            <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span class="nav-label">Text</span>
+            <span id="nav-text-count" class="nav-badge">{{len .Texts}}</span>
           </button>
           <button type="button" id="nav-btn-about" class="nav-item">
-            <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-            <span>About</span>
+            <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span class="nav-label">About</span>
           </button>
         </nav>
       </div>
 
       <div class="sidebar-bottom">
-        <div class="lan-status-badge">
-          <span class="status-dot"></span>
+        <div class="sidebar-lan-status">
+          <span class="status-indicator-dot"></span>
           <span>LAN Connected</span>
         </div>
 
-        <div class="sidebar-controls">
-          <div class="theme-toggle-group">
+        <div class="sidebar-footer-row">
+          <div class="theme-toggle-pill">
             <button type="button" class="theme-btn" id="theme-btn-light" title="Light Theme" aria-label="Light theme">
-              <svg width="14" height="14" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="4.22" x2="19.78" y2="5.64"></line></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="4.22" x2="19.78" y2="5.64"></line></svg>
             </button>
             <button type="button" class="theme-btn active" id="theme-btn-dark" title="Dark Theme" aria-label="Dark theme">
-              <svg width="14" height="14" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
             </button>
           </div>
-          <span id="sidebar-version" class="version-text">v0.8.9</span>
+          <span class="sidebar-version-tag">v0.8.10</span>
+          <button type="button" class="sidebar-settings-btn" id="nav-btn-settings" title="Settings" aria-label="Settings">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          </button>
         </div>
       </div>
     </aside>
 
-    <!-- Main Dynamic Viewport -->
-    <main class="main-viewport">
+    <!-- Main Viewport -->
+    <main class="main-viewport room-viewport" style="{{if eq .Status "closing"}}padding: 0; max-width: 100%; margin: 0; width: 100%;{{end}}">
       <!-- 1. Active Transfer Room View -->
-      <div id="room-active-card" class="active-room-layout">
-        <!-- Top Status & Metrics Bar -->
-        <header class="top-metrics-bar">
-          <div id="status-badge" class="room-active-indicator">
-            <span class="status-dot"></span>
-            <span>ROOM ACTIVE</span>
+      <div id="room-active-card" class="active-room-wrapper" style="{{if eq .Status "closing"}}display: none;{{end}}">
+        <!-- Top Header Area with Decorative Artwork, Brand, Script, Metrics & Close Action -->
+        <header class="room-top-header">
+          <!-- Decorative Contour & Lighthouse Backdrop -->
+          <div class="room-top-backdrop" aria-hidden="true">
+            <svg class="room-backdrop-svg" viewBox="0 0 1540 100" fill="none" preserveAspectRatio="none">
+              <defs>
+                <radialGradient id="lighthouseGlow" cx="90%" cy="35%" r="45%">
+                  <stop offset="0%" stop-color="#FF7800" stop-opacity="0.35" />
+                  <stop offset="35%" stop-color="#FF7800" stop-opacity="0.12" />
+                  <stop offset="100%" stop-color="#FF7800" stop-opacity="0.0" />
+                </radialGradient>
+              </defs>
+              <rect width="1540" height="100" fill="url(#lighthouseGlow)" />
+              
+              <!-- Contour waves across top -->
+              <path d="M0 60 Q 200 30 420 50 T 840 38 T 1200 55 T 1540 35" stroke="#FF7800" stroke-width="0.8" stroke-opacity="0.22" fill="none" />
+              <path d="M0 78 Q 250 45 500 65 T 950 45 T 1350 65 T 1540 50" stroke="#FF7800" stroke-width="1.1" stroke-opacity="0.32" fill="none" />
+              <path d="M0 95 Q 300 65 600 82 T 1100 65 T 1450 78 T 1540 70" stroke="#FF7800" stroke-width="0.7" stroke-opacity="0.20" fill="none" />
+              
+              <!-- Cliff & Lighthouse Silhouette on far right -->
+              <path d="M1300 100 L 1335 78 L 1370 70 L 1410 74 L 1450 65 L 1490 70 L 1540 58 L 1540 100 Z" fill="#0C0A09" />
+              <!-- Lighthouse Tower -->
+              <path d="M1362 70 L 1364 36 L 1376 36 L 1378 70 Z" fill="#090807" />
+              <rect x="1361" y="34" width="18" height="2" fill="#090807" />
+              <rect x="1363" y="24" width="14" height="10" fill="#FFB703" fill-opacity="0.95" rx="1" />
+              <path d="M1361 24 L 1370 15 L 1379 24 Z" fill="#090807" />
+              <circle cx="1370" cy="14" r="1.5" fill="#FF7800" />
+              <!-- Light beam -->
+              <polygon points="1370 29, 920 0, 1060 0" fill="#FFB703" fill-opacity="0.05" />
+            </svg>
           </div>
 
-          <div class="metrics-cluster">
-            <div class="metric-tile">
-              <span class="metric-value">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                <span id="metric-connected-count">0</span>
-              </span>
-              <span class="metric-label">CONNECTED</span>
+          <!-- Top Brand Center -->
+          <div class="room-top-brand">
+            <div class="room-brand-mark">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#FF7800" stroke-width="2" stroke-linejoin="round"/>
+                <path d="M2 17L12 22L22 17" stroke="#FF7800" stroke-width="2" stroke-linejoin="round"/>
+                <path d="M2 12L12 17L22 12" stroke="#FF7800" stroke-width="2" stroke-linejoin="round"/>
+              </svg>
             </div>
-            <div class="metric-tile">
-              <span class="metric-value metric-countdown" id="countdown">--:--</span>
-              <span class="metric-label">REMAINING</span>
-            </div>
-            <div class="metric-tile">
-              <span class="metric-value" id="metric-transferred-size">0 B</span>
-              <span class="metric-label">TRANSFERRED</span>
+            <div class="room-brand-text">
+              <span class="room-brand-name">HAMAL</span>
+              <span class="room-brand-tagline">TRANSFER LOCALLY</span>
             </div>
           </div>
 
-          <div>
-            <button type="button" id="close-room-btn" class="btn btn-danger-outline btn-sm">Close Room</button>
+          <!-- Handwritten Tagline -->
+          <div class="room-script-tagline" aria-hidden="true">Simple. Private. Yours.</div>
+
+          <!-- Top Metrics Card (3 Pillars) -->
+          <div class="top-metrics-card">
+            <div class="metric-segment">
+              <div class="metric-icon-wrap">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+              </div>
+              <div class="metric-info">
+                <span id="metric-connected-count" class="metric-num">0</span>
+                <span class="metric-desc">CONNECTED</span>
+              </div>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-segment">
+              <div class="metric-icon-wrap" style="color: var(--accent-amber);">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <div class="metric-info">
+                <span id="countdown" class="metric-num metric-countdown font-mono">--:--</span>
+                <span class="metric-desc">REMAINING</span>
+              </div>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-segment">
+              <div class="metric-icon-wrap" style="color: var(--accent-success);">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+              </div>
+              <div class="metric-info">
+                <span id="metric-transferred-size" class="metric-num font-mono">0 B</span>
+                <span class="metric-desc">TRANSFERRED</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Close Room Action Button -->
+          <div class="room-top-action">
+            <button type="button" id="close-room-btn" class="btn-close-room-outline">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+              <span>Close Room</span>
+            </button>
           </div>
         </header>
 
-        <!-- Central 2-Column Instrument Grid -->
-        <div class="instrument-grid">
-          <!-- Left Column: Pairing QR + Dropzone (310px width) -->
-          <div class="column-left">
-            <div class="dispatch-unified-panel">
-              <!-- QR Dispatch Panel -->
-              <div class="qr-panel">
-                <span class="qr-title">SCAN TO CONNECT</span>
-
-                <div id="qr-box" class="qr-box-wrapper" role="button" tabindex="0" title="Click to enlarge">
-                  <img id="qr-image" src="/api/v1/rooms/{{.ParticipantToken}}/qr.svg" alt="Participant QR Code" width="134" height="134">
+        <!-- Main 2-Column Dashboard Grid -->
+        <div class="room-dashboard-grid">
+          <!-- Left Column: Room Active Card + Tabs + Dropzone -->
+          <div class="dashboard-col-left">
+            <!-- Room Active & QR Card -->
+            <div class="room-active-card">
+              <div class="room-active-header">
+                <div class="room-active-dot-status">
+                  <span class="status-indicator-dot green"></span>
+                  <span class="room-active-title font-mono">ROOM ACTIVE</span>
                 </div>
-
-                {{if .PinRequired}}
-                <div id="pin-display-box" class="pin-display-wrap">
-                  <span class="pin-caption">PIN</span>
-                  <span class="pin-value" style="font-size: 13px; letter-spacing: 0.08em;">PROTECTED</span>
-                </div>
-                {{end}}
-
-                <div class="address-row">
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span class="address-label">ROOM ADDRESS</span>
-                    <span id="copy-toast" class="toast-badge">✓ Copied</span>
-                  </div>
-                  <div class="address-input-wrap">
-                    <input type="text" id="participant-link-input" class="address-input" value="{{.ParticipantURL}}" readonly spellcheck="false">
-                    <button type="button" id="copy-link-btn" class="btn-icon-copy" title="Copy Link" aria-label="Copy Link">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                    </button>
-                  </div>
-                </div>
+                <p class="room-active-sub">Share this QR code or link with other devices</p>
               </div>
 
-              <!-- Left Panel Sharing Mode Tabs -->
-              <div class="creator-mode-tabs-wrap" role="tablist" aria-label="Sharing Mode">
-                <button type="button" id="tab-files" class="creator-tab-btn active" role="tab" aria-selected="true" aria-controls="dropzone">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                  <span id="tab-files-label">Files</span>
-                  <span id="tab-files-badge" class="mode-pill">{{len .Files}}</span>
-                </button>
-                <button type="button" id="tab-text" class="creator-tab-btn" role="tab" aria-selected="false" aria-controls="creator-text-compose">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                  <span id="tab-text-label">Text</span>
-                  <span id="tab-text-badge" class="mode-pill">{{len .Texts}}</span>
-                </button>
+              <!-- Centered White QR Container -->
+              <div class="room-qr-container" id="qr-box" role="button" tabindex="0" title="Click to enlarge">
+                <img id="qr-image" src="/api/v1/rooms/{{.ParticipantToken}}/qr.svg" alt="Participant QR Code" class="room-qr-img" width="160" height="160">
               </div>
 
-              <!-- Dropzone Upload Panel (Files Mode) -->
-              <div id="dropzone" class="dropzone-panel sharing-mode-panel active">
-                <div class="dropzone-icon" id="dropzone-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              <!-- PIN Protected Block (if PIN enabled) -->
+              {{if .PinRequired}}
+              <div class="room-pin-box" id="pin-display-box">
+                <div class="room-pin-heading">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                  <span>PIN PROTECTED</span>
                 </div>
-                <span id="dropzone-title" class="dropzone-title">UPLOAD FILES</span>
-                <span id="dropzone-hint" class="dropzone-hint">Tap or drag files here</span>
-                <input type="file" id="file-input" multiple style="display: none;">
-
-                <div id="upload-progress-container" class="upload-progress-box" style="display: none;">
-                  <div class="upload-progress-info">
-                    <span id="upload-filename">Uploading file…</span>
-                    <span id="upload-percent">0%</span>
-                  </div>
-                  <div class="progress-track">
-                    <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
-                  </div>
-                  <div id="upload-error" class="form-hint" style="color: var(--accent-danger); display: none;"></div>
+                <div class="room-pin-controls">
+                  <span class="pin-masked font-mono" id="pin-masked-val">●●●●</span>
+                  <button type="button" class="pin-ctrl-btn" id="pin-creator-eye" title="Toggle PIN visibility" aria-label="Toggle PIN visibility">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  </button>
+                  <button type="button" class="pin-ctrl-btn" id="pin-creator-copy" title="Copy PIN" aria-label="Copy PIN">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  </button>
                 </div>
               </div>
+              {{end}}
 
-              <!-- Text Compose Panel (Text Mode) -->
-              <div id="creator-text-compose" class="creator-text-panel sharing-mode-panel" style="display: none;">
-                <div class="text-compose-header">
-                  <span id="text-compose-label" class="text-compose-title font-sans">SEND TEXT OR LINK</span>
-                  <span id="text-size-counter" class="text-counter font-mono">0 / 64 KB</span>
+              <!-- Room Address Row -->
+              <div class="room-address-box">
+                <div class="room-address-label-row">
+                  <div class="room-address-label">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                    <span>Room Address</span>
+                  </div>
+                  <span id="copy-toast" class="toast-badge">✓ Copied</span>
                 </div>
-                <div class="text-input-wrap">
-                  <textarea id="text-input" class="text-textarea font-sans" placeholder="Type or paste text, URLs, or notes here…" maxlength="65536" rows="4" aria-label="Text message content"></textarea>
-                </div>
-                <div class="text-compose-actions">
-                  <span id="text-compose-error" class="text-error-hint" style="display: none;"></span>
-                  <button type="button" id="send-text-btn" class="btn btn-primary btn-send-text">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                      <line x1="22" y1="2" x2="11" y2="13"></line>
-                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                    </svg>
-                    <span id="send-text-label">Send Text</span>
+                <div class="room-address-input-wrap">
+                  <input type="text" id="participant-link-input" class="room-address-input font-mono" value="{{.ParticipantURL}}" readonly spellcheck="false">
+                  <button type="button" id="copy-link-btn" class="room-address-copy-btn" title="Copy Room URL" aria-label="Copy Room URL">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                   </button>
                 </div>
               </div>
             </div>
+
+            <!-- Sharing Mode Switcher Tabs (Files vs Text) -->
+            <div class="room-mode-tabs" role="tablist" aria-label="Sharing Mode">
+              <button type="button" id="tab-files" class="room-mode-tab-btn active" role="tab" aria-selected="true" aria-controls="dropzone">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                <span>Files</span>
+                <span id="tab-files-badge" class="mode-tab-badge">{{len .Files}}</span>
+              </button>
+              <button type="button" id="tab-text" class="room-mode-tab-btn" role="tab" aria-selected="false" aria-controls="creator-text-compose">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                <span>Text</span>
+                <span id="tab-text-badge" class="mode-tab-badge">{{len .Texts}}</span>
+              </button>
+            </div>
+
+            <!-- Dropzone Upload Area (Files Mode) -->
+            <div id="dropzone" class="room-dropzone-box">
+              <div class="dropzone-cloud-icon">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
+                  <polyline points="12 13 12 8 9.5 10.5"></polyline>
+                  <line x1="12" y1="8" x2="14.5" y2="10.5"></line>
+                </svg>
+              </div>
+              <div class="dropzone-main-text" id="dropzone-title">Drop files here</div>
+              <div class="dropzone-sub-text">or <span class="dropzone-browse-link">click to browse</span></div>
+              <div class="dropzone-footer-note">Files are encrypted and automatically deleted when the room expires.</div>
+              <input type="file" id="file-input" multiple style="display: none;">
+
+              <div id="upload-progress-container" class="upload-progress-box" style="display: none;">
+                <div class="upload-progress-info">
+                  <span id="upload-filename">Uploading file…</span>
+                  <span id="upload-percent">0%</span>
+                </div>
+                <div class="progress-track">
+                  <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+                </div>
+                <div id="upload-error" class="form-hint" style="color: var(--accent-danger); display: none;"></div>
+              </div>
+            </div>
+
+            <!-- Text Compose Panel (Text Mode) -->
+            <div id="creator-text-compose" class="room-text-compose-box" style="display: none;">
+              <div class="text-compose-header">
+                <span id="text-compose-label" class="text-compose-title font-sans">SEND TEXT OR LINK</span>
+                <span id="text-size-counter" class="text-counter font-mono">0 / 64 KB</span>
+              </div>
+              <div class="text-input-wrap">
+                <textarea id="text-input" class="text-textarea font-sans" placeholder="Type or paste text, URLs, or notes here…" maxlength="65536" rows="4" aria-label="Text message content"></textarea>
+              </div>
+              <div class="text-compose-actions">
+                <span id="text-compose-error" class="text-error-hint" style="display: none;"></span>
+                <button type="button" id="send-text-btn" class="btn btn-primary btn-send-text">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                  </svg>
+                  <span id="send-text-label">Send Text</span>
+                </button>
+              </div>
+            </div>
           </div>
 
-          <!-- Right Column: 3 Separate Card Islands (Participants, Activity, Files / Texts) -->
-          <div class="column-right">
-            <!-- 1. Connected Participants Card -->
-            <section class="section-group">
-              <div class="section-header">
-                <span class="section-title">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                  <span>CONNECTED PARTICIPANTS</span> (<span id="participant-count">0</span>)
-                </span>
+          <!-- Right Column: 3 Dashboard Panels (Participants, Activity, Files / Text) -->
+          <div class="dashboard-col-right">
+            <!-- 1. Connected Participants Panel -->
+            <section class="dashboard-panel">
+              <div class="panel-header">
+                <div class="panel-title-group">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                  <span class="panel-title-text">CONNECTED PARTICIPANTS ( <span id="participant-count">0</span> )</span>
+                </div>
+                <button type="button" class="panel-action-btn" id="btn-copy-all-participants" title="Copy participant list">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  <span>Copy All</span>
+                </button>
               </div>
-              <div id="participant-list" class="participant-list">
-                <!-- Populated dynamically via authoritative backend API -->
-              </div>
-            </section>
-
-            <!-- 2. Recent Activity Card -->
-            <section class="section-group">
-              <div class="section-header">
-                <span class="section-title">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                  <span>RECENT ACTIVITY</span>
-                </span>
-              </div>
-              <div id="activity-list" class="activity-list">
-                <!-- Populated dynamically -->
+              <div id="participant-list" class="participant-list-box">
+                <!-- Dynamically populated via backend state -->
               </div>
             </section>
 
-            <!-- 3. Files in Room Card -->
-            <section id="creator-files-section" class="section-group sharing-mode-feed active">
-              <div class="section-header">
-                <span class="section-title">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                  <span>FILES IN ROOM</span> (<span id="file-count">{{len .Files}}</span>)
-                </span>
+            <!-- 2. Recent Activity Panel -->
+            <section class="dashboard-panel">
+              <div class="panel-header">
+                <div class="panel-title-group">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  <span class="panel-title-text">RECENT ACTIVITY</span>
+                </div>
+                <button type="button" class="panel-action-btn" id="btn-clear-activity" title="Clear activity log">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  <span>Clear All</span>
+                </button>
               </div>
-              <div id="file-list" class="file-list-container">
+              <div id="activity-list" class="activity-list-box">
+                <div class="panel-empty-state">
+                  <div class="empty-icon-circle">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  </div>
+                  <div class="empty-title">No transfer activity yet</div>
+                  <div class="empty-sub">Files and text you share will appear here</div>
+                </div>
+              </div>
+            </section>
+
+            <!-- 3. Files in Room Panel -->
+            <section id="creator-files-section" class="dashboard-panel">
+              <div class="panel-header">
+                <div class="panel-title-group">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                  <span class="panel-title-text">FILES IN ROOM ( <span id="file-count">{{len .Files}}</span> )</span>
+                </div>
+                <div class="view-switch-btns">
+                  <button type="button" class="view-toggle-btn active" id="view-list-btn" title="List View" aria-label="List View">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                  </button>
+                  <button type="button" class="view-toggle-btn" id="view-grid-btn" title="Grid View" aria-label="Grid View">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                  </button>
+                </div>
+              </div>
+              <div id="file-list" class="file-list-box">
                 {{if .Files}}
                   {{range .Files}}
                   <div class="file-row" data-file-id="{{.ID}}" data-filename="{{.OriginalFilename}}" data-size="{{.SizeBytes}}" data-content-type="{{.ContentType}}">
@@ -250,7 +380,7 @@
                       </div>
                       <div class="file-text-col">
                         <span class="file-title" title="{{.OriginalFilename}}">{{.OriginalFilename}}</span>
-                        <span class="file-specs">{{.SizeBytes}} B</span>
+                        <span class="file-specs font-mono">{{.SizeBytes}} B</span>
                       </div>
                     </div>
                     <div class="file-actions">
@@ -265,23 +395,26 @@
                   </div>
                   {{end}}
                 {{else}}
-                  <div id="no-files-msg" class="empty-state-box">
-                    <p class="empty-state-title">Nothing here yet.</p>
-                    <p class="empty-state-lead">Waiting for files. Drag files above or send parcels from your phone.</p>
+                  <div class="panel-empty-state large-empty">
+                    <div class="empty-folder-icon">
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="1.6"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    </div>
+                    <div class="empty-title large-title">Nothing here yet.</div>
+                    <div class="empty-sub">Waiting for files. Drag files from your device or use the upload area.</div>
                   </div>
                 {{end}}
               </div>
             </section>
 
-            <!-- 4. Text Messages in Room Card -->
-            <section id="creator-texts-section" class="section-group sharing-mode-feed" style="display: none;">
-              <div class="section-header">
-                <span class="section-title">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                  <span>TEXT MESSAGES</span> (<span id="text-count">{{len .Texts}}</span>)
-                </span>
+            <!-- 4. Text Messages in Room Panel -->
+            <section id="creator-texts-section" class="dashboard-panel" style="display: none;">
+              <div class="panel-header">
+                <div class="panel-title-group">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                  <span class="panel-title-text">TEXT MESSAGES ( <span id="text-count">{{len .Texts}}</span> )</span>
+                </div>
               </div>
-              <div id="text-list" class="text-list-container">
+              <div id="text-list" class="text-list-box">
                 {{if .Texts}}
                   {{range .Texts}}
                   <div class="text-item-card sender-{{.SenderType}}" data-text-id="{{.ID}}">
@@ -300,9 +433,9 @@
                   </div>
                   {{end}}
                 {{else}}
-                  <div id="no-texts-msg" class="empty-state-box">
-                    <p class="empty-state-title" id="no-texts-title">No text messages yet.</p>
-                    <p class="empty-state-lead" id="no-texts-desc">Paste commands, logs, snippets, or URLs to share directly.</p>
+                  <div class="panel-empty-state">
+                    <div class="empty-title" id="no-texts-title">No text messages yet.</div>
+                    <div class="empty-sub" id="no-texts-desc">Paste commands, logs, snippets, or URLs to share directly.</div>
                   </div>
                 {{end}}
               </div>
@@ -311,7 +444,234 @@
         </div>
       </div>
 
-      <!-- 2. Room Inactive / Closed State -->
+      <!-- 2. Room Closing State View -->
+      <div id="room-closing-card" class="closing-screen-wrapper" style="{{if ne .Status "closing"}}display: none;{{end}}">
+        <!-- Top Application Bar -->
+        <header class="client-top-bar">
+          <div class="client-brand-wrap">
+            <div class="client-brand-text-col">
+              <a href="/" class="client-brand" title="HAMAL">
+                <img src="/static/brand/hamal-logo-light.svg" alt="HAMAL" class="client-logo logo-light" width="104" height="24">
+                <img src="/static/brand/hamal-logo-dark.svg" alt="HAMAL" class="client-logo logo-dark" width="104" height="24">
+              </a>
+              <span class="client-brand-tagline">TRANSFER LOCALLY</span>
+            </div>
+            <div class="client-role-pill font-mono">HOST</div>
+          </div>
+
+          <!-- Top Right Status & Window Controls -->
+          <div class="client-top-right">
+            <div class="client-status-pills">
+              <span class="status-dot-amber"></span>
+              <span>Private</span>
+              <span class="status-dot-muted"></span>
+              <span>Local</span>
+              <span class="status-dot-muted"></span>
+              <span>Yours</span>
+            </div>
+
+            <div class="client-window-controls" aria-hidden="true">
+              <span class="win-btn win-min" title="Minimize">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line></svg>
+              </span>
+              <span class="win-btn win-max" title="Maximize">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+              </span>
+              <span class="win-btn win-close" title="Close">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </span>
+            </div>
+          </div>
+        </header>
+
+        <!-- PIN & Closing Cinematic Main Section -->
+        <section class="client-pin-barrier-section closing-barrier-section">
+          <!-- Background Atmospheric Elements -->
+          <div class="pin-bg-decorations" aria-hidden="true">
+            <!-- Left Handwritten Callout -->
+            <div class="pin-handwritten-callout">
+              <span class="handwritten-line">Share</span>
+              <span class="handwritten-line">Without</span>
+              <span class="handwritten-line">Limits.</span>
+              <svg class="handwritten-underline-pin" width="84" height="18" viewBox="0 0 84 18" fill="none">
+                <path d="M2 5C26 2 60 2 82 6" stroke="#FF7800" stroke-width="2.8" stroke-linecap="round"/>
+                <path d="M12 13C34 11 62 10 76 14" stroke="#FF7800" stroke-width="2.2" stroke-linecap="round"/>
+              </svg>
+            </div>
+
+            <!-- Right Mountain Silhouette & Tagline -->
+            <div class="pin-mountain-backdrop">
+              <svg class="mountain-vector-pin" viewBox="0 0 860 580" fill="none" preserveAspectRatio="none">
+                <defs>
+                  <radialGradient id="closingHostMountainGlow" cx="72%" cy="28%" r="72%">
+                    <stop offset="0%" stop-color="#FF7800" stop-opacity="0.42" />
+                    <stop offset="40%" stop-color="#FF7800" stop-opacity="0.12" />
+                    <stop offset="100%" stop-color="#FF7800" stop-opacity="0.0" />
+                  </radialGradient>
+                  <linearGradient id="closingHostPeakGrad1" x1="20%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#1A1510" stop-opacity="0.98" />
+                    <stop offset="100%" stop-color="#080A0B" stop-opacity="0.4" />
+                  </linearGradient>
+                  <linearGradient id="closingHostPeakGrad2" x1="30%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#231910" stop-opacity="0.95" />
+                    <stop offset="100%" stop-color="#080A0B" stop-opacity="0.2" />
+                  </linearGradient>
+                  <linearGradient id="closingHostPeakGrad3" x1="10%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#2C1E12" stop-opacity="0.9" />
+                    <stop offset="100%" stop-color="#080A0B" stop-opacity="0.1" />
+                  </linearGradient>
+                </defs>
+                <rect width="860" height="580" fill="url(#closingHostMountainGlow)" />
+                <path d="M40 580 L 180 380 L 290 280 L 420 150 L 530 220 L 680 90 L 760 170 L 860 120 L 860 580 Z" fill="url(#closingHostPeakGrad1)" />
+                <path d="M40 580 L 180 380 L 290 280 L 420 150 L 530 220 L 680 90 L 760 170 L 860 120" stroke="#FF7800" stroke-width="1.6" stroke-opacity="0.45" stroke-dasharray="2 3" />
+                <path d="M100 580 L 220 390 L 350 250 L 480 180 L 580 260 L 710 130 L 790 200 L 860 160 L 860 580 Z" fill="url(#closingHostPeakGrad2)" />
+                <path d="M100 580 L 220 390 L 350 250 L 480 180 L 580 260 L 710 130 L 790 200 L 860 160" stroke="#FF8A00" stroke-width="2.6" stroke-opacity="0.75" />
+                <path d="M480 180 L 520 280 L 580 260 L 650 360 L 710 130 L 750 270 L 790 200 L 840 320 L 860 580 L 480 580 Z" fill="#120E0A" fill-opacity="0.6" />
+                <path d="M200 580 L 320 420 L 440 300 L 560 250 L 660 310 L 770 210 L 860 250 L 860 580 Z" fill="url(#closingHostPeakGrad3)" />
+                <path d="M200 580 L 320 420 L 440 300 L 560 250 L 660 310 L 770 210 L 860 250" stroke="#FFA024" stroke-width="1.8" stroke-opacity="0.6" />
+                <path d="M220 390 Q 290 310 350 250 Q 420 210 480 180 Q 540 215 580 260 Q 640 190 710 130 Q 750 165 790 200 Q 825 180 860 160" stroke="#FF7800" stroke-width="1.2" stroke-opacity="0.5" stroke-dasharray="1 3" />
+                <path d="M280 440 Q 370 340 450 280 Q 530 255 600 290 Q 680 245 750 230 L 860 270" stroke="#FF7800" stroke-width="1.2" stroke-opacity="0.4" stroke-dasharray="2 4" />
+                <path d="M340 490 Q 430 390 510 330 Q 590 305 660 350 L 860 320" stroke="#FF7800" stroke-width="0.9" stroke-opacity="0.3" stroke-dasharray="2 3" />
+              </svg>
+              <div class="pin-mountain-tagline font-mono">
+                <span>SIMPLE.</span>
+                <span>PRIVATE.</span>
+                <span>YOURS.</span>
+              </div>
+            </div>
+
+            <!-- Lower Wireframe Landscape Waves with Water Reflection -->
+            <div class="pin-wireframe-landscape">
+              <svg class="wireframe-wave-svg" viewBox="0 0 1776 340" fill="none" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="closingHostWaveReflectGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#FF7800" stop-opacity="0.32" />
+                    <stop offset="40%" stop-color="#FF7800" stop-opacity="0.10" />
+                    <stop offset="100%" stop-color="#080A0B" stop-opacity="0.0" />
+                  </linearGradient>
+                </defs>
+                <path d="M0 200 Q 444 40 888 175 T 1776 125" stroke="#FF7800" stroke-width="1.5" stroke-opacity="0.55" stroke-dasharray="2 3" />
+                <path d="M0 225 Q 444 70 888 200 T 1776 150" stroke="#FF8A00" stroke-width="1.8" stroke-opacity="0.45" stroke-dasharray="3 4" />
+                <path d="M0 250 Q 444 100 888 225 T 1776 180" stroke="#FF7800" stroke-width="1.3" stroke-opacity="0.35" stroke-dasharray="1 3" />
+                <path d="M0 270 Q 444 130 888 245 T 1776 210" stroke="#FF7800" stroke-width="1.0" stroke-opacity="0.25" />
+                <path d="M120 340 Q 200 230 300 130" stroke="#FF7800" stroke-width="0.8" stroke-opacity="0.2" stroke-dasharray="1 3" />
+                <path d="M340 340 Q 420 240 520 110" stroke="#FF7800" stroke-width="0.8" stroke-opacity="0.22" stroke-dasharray="1 3" />
+                <path d="M600 340 Q 680 240 780 120" stroke="#FF7800" stroke-width="0.9" stroke-opacity="0.25" stroke-dasharray="1 3" />
+                <path d="M888 340 Q 940 240 1020 140" stroke="#FF7800" stroke-width="0.9" stroke-opacity="0.25" stroke-dasharray="1 3" />
+                <path d="M1176 340 Q 1230 240 1300 130" stroke="#FF7800" stroke-width="0.9" stroke-opacity="0.25" stroke-dasharray="1 3" />
+                <path d="M1440 340 Q 1500 230 1560 120" stroke="#FF7800" stroke-width="0.8" stroke-opacity="0.22" stroke-dasharray="1 3" />
+                <path d="M1660 340 Q 1710 230 1760 110" stroke="#FF7800" stroke-width="0.8" stroke-opacity="0.2" stroke-dasharray="1 3" />
+                <rect y="175" width="1776" height="165" fill="url(#closingHostWaveReflectGrad)" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- Main Centered Closing Card -->
+          <div class="pin-join-card closing-main-card">
+            <div class="pin-lock-circle closing-power-badge">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                <line x1="12" y1="2" x2="12" y2="12"></line>
+              </svg>
+            </div>
+
+            <div class="pin-eyebrow font-mono">CLOSING ROOM</div>
+
+            <h1 class="pin-main-title font-sans">
+              <span class="title-white">Room will close </span><span class="title-orange">soon</span>
+            </h1>
+
+            <p class="pin-card-desc">The room is being closed. Active transfers will<br>continue until the countdown ends.</p>
+
+            <!-- Dynamic Countdown Gauge -->
+            <div class="closing-progress-wrap">
+              <svg class="closing-progress-ring-svg" viewBox="0 0 172 172">
+                <circle class="ring-bg" cx="86" cy="86" r="72"></circle>
+                <circle id="closing-ring-fill" class="ring-fill" cx="86" cy="86" r="72"></circle>
+              </svg>
+              <div class="closing-center-meta">
+                <div id="closing-countdown" class="closing-number">{{if .ClosingRemainingSeconds}}{{.ClosingRemainingSeconds}}{{else}}10{{end}}</div>
+                <div class="closing-meta-lbl font-mono">SECONDS</div>
+                <div class="closing-meta-lbl font-mono">REMAINING</div>
+              </div>
+            </div>
+
+            <!-- Informational Message Box -->
+            <div class="closing-info-banner">
+              <svg class="closing-info-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+              <span class="closing-info-text">Please keep this window open until the room is fully closed.<br>Your transfers will not be interrupted.</span>
+            </div>
+
+            <!-- Cancel Button -->
+            <button type="button" id="cancel-closing-btn" class="btn-cancel-closing font-sans">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="4" width="16" height="16" rx="3" ry="3"></rect>
+              </svg>
+              <span>Cancel Close</span>
+            </button>
+          </div>
+
+          <!-- Feature Indicators (3 Columns with Dividers) -->
+          <div class="pin-features-row">
+            <div class="pin-feature-item">
+              <div class="pin-feature-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+              </div>
+              <div class="pin-feature-text">
+                <div class="pin-feature-title">PIN Protected</div>
+                <div class="pin-feature-sub">Temporary access</div>
+              </div>
+            </div>
+
+            <div class="pin-feature-divider"></div>
+
+            <div class="pin-feature-item">
+              <div class="pin-feature-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+              </div>
+              <div class="pin-feature-text">
+                <div class="pin-feature-title">Local Network</div>
+                <div class="pin-feature-sub">Private transfer</div>
+              </div>
+            </div>
+
+            <div class="pin-feature-divider"></div>
+
+            <div class="pin-feature-item">
+              <div class="pin-feature-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+              </div>
+              <div class="pin-feature-text">
+                <div class="pin-feature-title">Auto Expiring</div>
+                <div class="pin-feature-sub">Temporary room</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Version & HAMAL Branding -->
+          <div class="pin-bottom-bar">
+            <div class="pin-version font-mono">v0.8.10</div>
+            <div class="pin-brand-accent">
+              <span class="pin-brand-name font-sans">HAMAL</span>
+              <span class="pin-accent-line"></span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 3. Room Inactive / Closed State -->
       <div id="room-inactive-card" class="state-view hidden" style="align-items: center; justify-content: center; padding: 40px;">
         <div class="panel" style="max-width: 440px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px;">
           <div class="close-modal-icon" style="color: var(--text-muted); background: var(--bg-elevated); border-color: var(--border-color);">
@@ -354,7 +714,7 @@
       <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span class="font-mono" style="font-size: 12px; color: var(--accent-amber);">FAST · PRIVATE · TEMPORARY · LOCAL</span>
-          <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">v0.8.9</span>
+          <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">v0.8.10</span>
         </div>
         <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
           HAMAL is a quiet, precise digital courier designed to move files point-to-point on your local network without cloud storage, accounts, or telemetry.

@@ -18,8 +18,7 @@
   <script>
     (function() {
       var saved = localStorage.getItem('hamal_theme');
-      var prefDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      var theme = saved || (prefDark ? 'dark' : 'light');
+      var theme = saved || 'dark';
       document.documentElement.setAttribute('data-theme', theme);
     })();
   </script>
