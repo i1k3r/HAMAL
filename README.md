@@ -5,7 +5,7 @@
 
 # HAMAL
 
-**Fast, private, temporary file transfer.**
+**Fast, private, temporary file and clipboard transfer.**
 
 [![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go)](https://golang.org)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker)](Dockerfile)
@@ -54,13 +54,18 @@ In traditional culture, a *hamal* carries goods and heavy loads from one place t
 
 ## Key Features
 
-- 🚀 **Zero Setup for Participants**: Scan a QR code or open a local link to immediately upload or download files.
+- 📋 **Temporary Text / Clipboard Channel**: Send plain text, shell commands, PowerShell commands, logs, JSON/YAML, configuration, URLs, and other technical snippets between devices in the same temporary room. Copy, paste, send, receive, and copy again without accounts or a permanent chat history.
+- 🔄 **Two-Way CLIENT ↔ CLIENT Text Sharing**: Both devices can send text through the same room. Messages are labelled **CLIENT** and system activity is labelled **SERVER**.
+- 📎 **One-Click Copy**: Every shared client message can be copied as the original plain text, preserving multiline content and formatting.
+- 🚀 **Zero Setup for Participants**: Scan a QR code or open a local link to immediately upload/download files or use the temporary Text / Clipboard channel.
 - ⏱️ **Auto-Expiring Rooms**: Rooms automatically expire and clean up files after a configurable TTL (5 minutes to 24 hours).
 - 🔒 **PIN Protection**: Optional 4–8 digit PIN with exponential backoff and lockout to prevent brute-force attacks.
 - 📦 **True Streaming I/O**: Multi-gigabyte transfers stream directly to disk without exhausting server RAM.
 - 🎨 **Warm Courier Aesthetics**: Clean, modern interface in dark and light modes with warm amber courier accents.
 - 🔍 **Interactive QR Lightbox**: One-click smooth zoom for scanning QR codes from across the room.
 - 🛡️ **Self-Hosted & Private**: Zero cloud dependencies, zero external analytics, zero tracking.
+
+Text messages are temporary and scoped to their room. They are removed with the room lifecycle; the text channel is a technical clipboard rather than a permanent chat application. Each message is limited to 64 KB, with up to 200 messages per room.
 
 ---
 
