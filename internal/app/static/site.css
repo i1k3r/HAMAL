@@ -2745,3 +2745,46 @@ svg {
   }
 }
 
+
+
+/* HAMAL landing hero visual */
+.hero-box {
+  position: relative;
+  overflow: hidden;
+}
+.hero-visual {
+  position: absolute;
+  right: -18px;
+  top: 50%;
+  width: min(48%, 520px);
+  transform: translateY(-50%);
+  pointer-events: none;
+  opacity: .9;
+  mask-image: linear-gradient(to right, transparent 0%, black 18%, black 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 18%, black 100%);
+}
+.hero-visual img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+@media (max-width: 900px) {
+  .hero-visual {
+    position: relative;
+    right: auto;
+    top: auto;
+    transform: none;
+    width: min(100%, 560px);
+    margin: -10px auto 4px;
+    opacity: .72;
+    mask-image: linear-gradient(to bottom, transparent 0%, black 16%, black 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 16%, black 100%);
+  }
+}
+@media (max-width: 560px) {
+  .hero-visual {
+    width: 115%;
+    margin-left: -7.5%;
+    opacity: .58;
+  }
+}
