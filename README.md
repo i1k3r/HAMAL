@@ -58,10 +58,6 @@ The current interface uses a dark, high-contrast visual language with warm amber
 ### Client — Desktop
 <img src="docs/screenshots/participant_desktop_clipboard.png" alt="HAMAL Client Desktop" width="900" />
 
-<br/><br/>
-
-### Client — Mobile
-<img src="docs/screenshots/participant_mobile_390px.png" alt="HAMAL Client Mobile" width="390" />
 
 </div>
 
