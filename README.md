@@ -18,35 +18,50 @@
 
 ## What is HAMAL?
 
-**HAMAL** (Turkish for *porter* / *carrier*) is a fast, lightweight, self-hosted web application designed for frictionless, temporary file transfers across your local network (LAN / Wi-Fi).
+**HAMAL** (Turkish for *porter* / *carrier*) is a lightweight, self-hosted web application for temporary file and text transfers between devices on the same LAN / Wi-Fi network.
 
-In traditional culture, a *hamal* carries goods and heavy loads from one place to another. In **HAMAL**, the cargo is digital: files move directly between devices on your local network without intermediate cloud storage, permanent user accounts, advertising, or telemetry.
+The idea is simple: create a temporary room, share the generated QR code or local link, and move digital cargo between devices without a cloud upload, account system, advertising, or telemetry.
 
-```
-+---------------+                    +----------------+                    +-----------------+
-|               |  1. Scans QR Code  |                |  2. Streams File   |                 |
-|  Room Creator | -----------------> |  HAMAL Server  | <----------------- |   Participant   |
-|   (Desktop)   |                    | (Local Network)|                    | (Mobile/Laptop) |
-+---------------+                    +----------------+                    +-----------------+
-```
+HAMAL is built around short-lived transfer rooms rather than permanent storage. Rooms expire automatically, and their temporary files and text follow the room lifecycle.
+
+### How it works
+
+1. Create a temporary room.
+2. Optionally protect it with a PIN.
+3. Scan the QR code or open the local room link.
+4. Transfer files or send temporary text between connected devices.
+5. Let the room expire automatically, or close it manually.
 
 ---
 
 ## Screenshots
 
+The current interface uses a dark, high-contrast visual language with warm amber accents and responsive layouts for desktop and mobile.
+
 <div align="center">
 
-### Home / Landing Page
-*Start temporary transfer rooms with customizable TTL and optional PIN security.*
-<br/>
-<img src="docs/screenshots/home.jpg" alt="HAMAL Home UI" width="900" />
+### Home / Create Room
+<img src="docs/screenshots/home_new.png" alt="HAMAL Create Room" width="900" />
 
 <br/><br/>
 
-### Creator Dispatch Dashboard
-*Real-time QR code with instant expansion lightbox, parcel dropzone, countdown timer, and secure file manifests.*
-<br/>
-<img src="docs/screenshots/creator.jpg" alt="HAMAL Creator UI" width="900" />
+### Creator Dashboard
+<img src="docs/screenshots/creator.jpg" alt="HAMAL Creator Dashboard" width="900" />
+
+<br/><br/>
+
+### Temporary Text / Clipboard
+<img src="docs/screenshots/creator_clipboard_messages.png" alt="HAMAL Temporary Text and Clipboard" width="900" />
+
+<br/><br/>
+
+### Client — Desktop
+<img src="docs/screenshots/participant_desktop_clipboard.png" alt="HAMAL Client Desktop" width="900" />
+
+<br/><br/>
+
+### Client — Mobile
+<img src="docs/screenshots/participant_mobile_390px.png" alt="HAMAL Client Mobile" width="390" />
 
 </div>
 
@@ -54,14 +69,14 @@ In traditional culture, a *hamal* carries goods and heavy loads from one place t
 
 ## Key Features
 
-- 📋 **Temporary Text / Clipboard Channel**: Send plain text, shell commands, PowerShell commands, logs, JSON/YAML, configuration, URLs, and other technical snippets between devices in the same temporary room. Copy, paste, send, receive, and copy again without accounts or a permanent chat history.
+- 📋 **Temporary Text / Clipboard**: Send plain text, commands, logs, JSON/YAML, URLs, configuration snippets, and other technical text through the same temporary room.
 - 🔄 **Two-Way CLIENT ↔ CLIENT Text Sharing**: Both devices can send text through the same room. Messages are labelled **CLIENT** and system activity is labelled **SERVER**.
 - 📎 **One-Click Copy**: Every shared client message can be copied as the original plain text, preserving multiline content and formatting.
 - 🚀 **Zero Setup for Participants**: Scan a QR code or open a local link to immediately upload/download files or use the temporary Text / Clipboard channel.
-- ⏱️ **Auto-Expiring Rooms**: Rooms automatically expire and clean up files after a configurable TTL (5 minutes to 24 hours).
+- ⏱️ **Auto-Expiring Rooms**: Rooms automatically expire and clean up temporary content after a configurable TTL.
 - 🔒 **PIN Protection**: Optional 4–8 digit PIN with exponential backoff and lockout to prevent brute-force attacks.
 - 📦 **True Streaming I/O**: Multi-gigabyte transfers stream directly to disk without exhausting server RAM.
-- 🎨 **Warm Courier Aesthetics**: Clean, modern interface in dark and light modes with warm amber courier accents.
+- 🎨 **Responsive HAMAL UI**: Dark-first interface with warm amber accents, plus a preserved light theme for users who prefer it.
 - 🔍 **Interactive QR Lightbox**: One-click smooth zoom for scanning QR codes from across the room.
 - 🛡️ **Self-Hosted & Private**: Zero cloud dependencies, zero external analytics, zero tracking.
 
