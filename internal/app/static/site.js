@@ -1763,7 +1763,8 @@
             }
           } catch (e) {}
           processNextUpload();
-      };
+        }
+      });
 
       xhr.onerror = () => {
         showUploadError(`${file.name}: Upload failed or connection interrupted.`);
