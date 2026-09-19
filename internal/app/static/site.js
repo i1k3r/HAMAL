@@ -2170,6 +2170,10 @@
               pinCard.style.display = 'none';
               pinCard.classList.add('hidden');
             }
+            const mainContainer = document.querySelector('.client-main-container');
+            if (mainContainer) {
+              mainContainer.style.display = '';
+            }
             if (activeCard) {
               activeCard.style.display = 'flex';
               activeCard.classList.remove('hidden');
