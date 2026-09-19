@@ -10,7 +10,7 @@
   <TemplateURL>https://raw.githubusercontent.com/i1k3r/HAMAL/main/unraid-template.xml</TemplateURL>
   <ReadMe>https://github.com/i1k3r/HAMAL#readme</ReadMe>
   <Overview>HAMAL is a private, self-hosted LAN file and temporary clipboard transfer service. Create temporary rooms, connect devices with QR codes, transfer files directly across your local network, or use the room-scoped Text / Clipboard channel for commands, terminal output, logs, configuration, URLs, and plain text. Optional PIN protection and automatic room expiration keep transfers temporary and private.</Overview>
-  <Changes>v0.8.9 - Added temporary two-way Text / Clipboard sharing between clients, CLIENT and SERVER activity messages, one-click copy, multiline technical text support, room-scoped text storage, and responsive mobile/tablet text UI.</Changes>
+  <Changes>v0.8.11 - Refreshed the HAMAL UI across desktop and mobile, improved Create Room, Host Active Room, Client PIN, Client Room and Close Room screens, added responsive UI improvements, and fixed CodeQL insecure-randomness findings by using cryptographically secure browser APIs for client session IDs.</Changes>
   <License>HAMAL Source-Available Organizational Use License</License>
   <ExtraSearchTerms>clipboard text transfer temporary sharing LAN file transfer local file transfer QR file transfer temporary clipboard</ExtraSearchTerms>
   <Category>Tools: Productivity: Network:Web</Category>
