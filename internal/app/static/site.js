@@ -1629,7 +1629,7 @@
           if (page === 'participant' && data.pin_required && !data.pin_authenticated) {
             if (pinCard) {
               pinCard.classList.remove('hidden');
-              pinCard.style.display = 'block';
+              pinCard.style.display = 'flex';
             }
             if (activeCard) {
               activeCard.classList.add('hidden');
