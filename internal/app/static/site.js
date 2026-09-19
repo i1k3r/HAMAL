@@ -1739,7 +1739,7 @@
 
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `/api/v1/rooms/${encodeURIComponent(token)}/files?filename=${encodeURIComponent(file.name)}`);
-      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      // Let the browser set multipart/form-data with the required boundary.
       xhr.setRequestHeader('X-Client-Session-ID', getClientSessionId());
 
       xhr.upload.addEventListener('progress', (e) => {
