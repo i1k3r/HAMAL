@@ -3911,6 +3911,7 @@ svg {
 }
 
 .pin-handwritten-callout {
+  display: none;
   position: absolute;
   left: 8%;
   top: 22%;
