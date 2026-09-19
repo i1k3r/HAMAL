@@ -1771,6 +1771,8 @@
         processNextUpload();
       };
 
+      const formData = new FormData();
+      formData.append('file', file, file.name);
       xhr.send(formData);
     }
 
