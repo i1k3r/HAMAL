@@ -1491,7 +1491,8 @@
       const wasNearBottom = (textListEl.scrollHeight - textListEl.scrollTop - textListEl.clientHeight) < 70;
       textListEl.innerHTML = '';
 
-      texts.forEach((item) => {
+      const orderedTexts = [...texts].reverse();
+      orderedTexts.forEach((item) => {
         const isServer = item.sender_type === 'server';
         const isSelf = Boolean(item.is_self);
         const card = document.createElement('div');
