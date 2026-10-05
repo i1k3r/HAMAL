@@ -179,3 +179,38 @@ func TestValidateDBPathEnforcesDataDirContainment(t *testing.T) {
 		})
 	}
 }
+
+func TestParseTrustedProxyAcceptsIPsAndCIDRs(t *testing.T) {
+	valid := map[string]string{
+		"10.0.0.0/8":    "10.0.0.0/8",
+		"192.168.1.5":   "192.168.1.5/32",
+		" 192.168.1.5 ": "192.168.1.5/32",
+		"::1":           "::1/128",
+		"fd00::/8":      "fd00::/8",
+	}
+	for in, want := range valid {
+		ipNet, err := ParseTrustedProxy(in)
+		if err != nil {
+			t.Errorf("ParseTrustedProxy(%q) unexpected error: %v", in, err)
+			continue
+		}
+		if ipNet.String() != want {
+			t.Errorf("ParseTrustedProxy(%q) = %s, want %s", in, ipNet, want)
+		}
+	}
+	for _, in := range []string{"", "proxy.local", "10.0.0.0/33", "300.1.1.1"} {
+		if _, err := ParseTrustedProxy(in); err == nil {
+			t.Errorf("ParseTrustedProxy(%q) should fail", in)
+		}
+	}
+
+	cfg := Default()
+	cfg.TrustedProxies = []string{"192.168.1.5", "10.0.0.0/8"}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("bare IPs and CIDRs must both validate: %v", err)
+	}
+	cfg.TrustedProxies = []string{"not-an-ip"}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("invalid trusted proxy must be rejected")
+	}
+}

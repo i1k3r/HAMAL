@@ -11,9 +11,7 @@
   <link rel="icon" type="image/svg+xml" href="/static/brand/hamal-app-icon.svg">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/static/brand/hamal-app-icon.svg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/fonts/fonts.css">
   <link rel="stylesheet" href="/static/site.css">
   <script>
     (function() {
@@ -24,7 +22,7 @@
   </script>
   <script defer src="/static/site.js"></script>
 </head>
-<body data-page="creator" data-role="CREATOR" data-token="{{.CreatorToken}}" data-expires="{{.ExpiresAtRFC3339}}" data-status="{{.Status}}" data-closing-seconds="{{.ClosingRemainingSeconds}}" data-participant-token="{{.ParticipantToken}}" data-global-share-enabled="{{.GlobalShareEnabled}}" data-pin-required="{{.PinRequired}}">
+<body data-page="creator" data-role="CREATOR" data-token="{{.CreatorToken}}" data-expires="{{.ExpiresAtRFC3339}}" data-status="{{.Status}}" data-closing-seconds="{{.ClosingRemainingSeconds}}" data-participant-token="{{.ParticipantToken}}" data-global-share-enabled="{{.GlobalShareEnabled}}" data-pin-required="{{.PinRequired}}" data-max-text-size="{{.MaxTextSize}}">
   <div class="app-container">
     <!-- Persistent Left Navigation Sidebar -->
     <aside class="sidebar" style="{{if eq .Status "closing"}}display: none;{{end}}">
@@ -275,7 +273,7 @@
               </div>
               <div class="dropzone-main-text" id="dropzone-title">Drop files here</div>
               <div class="dropzone-sub-text">or <span class="dropzone-browse-link">click to browse</span></div>
-              <div class="dropzone-footer-note">Files are encrypted and automatically deleted when the room expires.</div>
+              <div class="dropzone-footer-note">Files are stored temporarily on this server and deleted automatically when the room expires or is closed.</div>
               <input type="file" id="file-input" multiple style="display: none;">
 
               <div id="upload-progress-container" class="upload-progress-box" style="display: none;">
@@ -581,7 +579,7 @@
               <span class="title-white">Room will close </span><span class="title-orange">soon</span>
             </h1>
 
-            <p class="pin-card-desc">The room is being closed. Active transfers will<br>continue until the countdown ends.</p>
+            <p class="pin-card-desc">The room is being closed. New transfers are no<br>longer accepted.</p>
 
             <!-- Dynamic Countdown Gauge -->
             <div class="closing-progress-wrap">
@@ -603,16 +601,8 @@
                 <line x1="12" y1="16" x2="12" y2="12"></line>
                 <line x1="12" y1="8" x2="12.01" y2="8"></line>
               </svg>
-              <span class="closing-info-text">Please keep this window open until the room is fully closed.<br>Your transfers will not be interrupted.</span>
+              <span class="closing-info-text">When the countdown ends, the room and all of its files are deleted.<br>Transfers that have not finished by then are lost.</span>
             </div>
-
-            <!-- Cancel Button -->
-            <button type="button" id="cancel-closing-btn" class="btn-cancel-closing font-sans">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="4" y="4" width="16" height="16" rx="3" ry="3"></rect>
-              </svg>
-              <span>Cancel Close</span>
-            </button>
           </div>
 
           <!-- Feature Indicators (3 Columns with Dividers) -->
@@ -678,7 +668,7 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
           </div>
           <h2 class="hero-title" style="font-size: 20px;" id="inactive-title">Room Closed</h2>
-          <p class="hero-lead" style="font-size: 13px;" id="inactive-message">This temporary transfer room has been closed and all files purged.</p>
+          <p class="hero-lead" style="font-size: 13px;" id="inactive-message">This temporary transfer room has been closed. Its files are no longer accessible and are being deleted.</p>
           <a href="/" class="btn btn-primary" style="margin-top: 8px;">Create New Room</a>
         </div>
       </div>

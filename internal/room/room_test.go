@@ -266,14 +266,14 @@ func TestStoreRoomClosingLifecycle(t *testing.T) {
 }
 
 func TestValidatePIN(t *testing.T) {
-	valid := []string{"1234", "0000", "98765432", "abcd", "A1b2", " 123456 "}
+	valid := []string{"1234", "0000", "98765432", " 123456 "}
 	for _, p := range valid {
 		if err := ValidatePIN(p); err != nil {
 			t.Errorf("expected PIN %q to be valid, got: %v", p, err)
 		}
 	}
 
-	invalid := []string{"", "12", "123", "123456789", "12\x0034", "123\n"}
+	invalid := []string{"", "12", "123", "123456789", "12\x0034", "123\n", "abcd", "A1b2", "12 34", "12.34", "１２３４"}
 	for _, p := range invalid {
 		if err := ValidatePIN(p); err == nil {
 			t.Errorf("expected PIN %q to be invalid, got nil", p)

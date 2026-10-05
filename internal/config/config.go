@@ -229,11 +229,28 @@ func (c Config) Validate() error {
 		return fmt.Errorf("LAN_DROP_SECURE_COOKIES must be auto, true, or false")
 	}
 	for _, proxy := range c.TrustedProxies {
-		if _, _, err := net.ParseCIDR(proxy); err != nil {
-			return fmt.Errorf("invalid trusted proxy CIDR %q", proxy)
+		if _, err := ParseTrustedProxy(proxy); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+// ParseTrustedProxy parses one LAN_DROP_TRUSTED_PROXIES entry. It accepts CIDR notation
+// ("10.0.0.0/8") as well as a single IPv4/IPv6 address ("192.168.1.5"), which is treated as a
+// one-address network.
+func ParseTrustedProxy(value string) (*net.IPNet, error) {
+	trimmed := strings.TrimSpace(value)
+	if _, ipNet, err := net.ParseCIDR(trimmed); err == nil {
+		return ipNet, nil
+	}
+	if ip := net.ParseIP(trimmed); ip != nil {
+		if v4 := ip.To4(); v4 != nil {
+			return &net.IPNet{IP: v4, Mask: net.CIDRMask(32, 32)}, nil
+		}
+		return &net.IPNet{IP: ip, Mask: net.CIDRMask(128, 128)}, nil
+	}
+	return nil, fmt.Errorf("invalid trusted proxy %q: expected an IP address or CIDR", value)
 }
 
 func envString(key, fallback string) string {

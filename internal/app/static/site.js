@@ -112,9 +112,9 @@
       const ttlSeconds = parseInt(ttlSelect ? ttlSelect.value : '3600', 10);
       const pin = pinInput ? pinInput.value.trim() : '';
 
-      if (pin.length > 0 && (pin.length < 4 || pin.length > 8)) {
+      if (pin.length > 0 && !/^[0-9]{4,8}$/.test(pin)) {
         if (formError) {
-          formError.textContent = 'PIN must be between 4 and 8 characters';
+          formError.textContent = 'PIN must be 4 to 8 digits';
           formError.style.display = 'block';
         }
         return;
@@ -171,6 +171,13 @@
     const pinToggleBtn = document.getElementById('pin-toggle-btn');
     const pinInput = document.getElementById('pin-input');
     const pinEyeIcon = document.getElementById('pin-eye-icon');
+    if (pinInput) {
+      // PINs are 4-8 digits everywhere (creation form, join form and server).
+      pinInput.addEventListener('input', () => {
+        const digits = pinInput.value.replace(/[^0-9]/g, '');
+        if (digits !== pinInput.value) pinInput.value = digits;
+      });
+    }
     if (pinToggleBtn && pinInput) {
       pinToggleBtn.addEventListener('click', () => {
         const isPassword = pinInput.getAttribute('type') === 'password';
@@ -1035,13 +1042,6 @@
       }, 1000);
     }
 
-    const cancelCloseBtn = document.getElementById('cancel-closing-btn');
-    if (cancelCloseBtn) {
-      cancelCloseBtn.addEventListener('click', () => {
-        window.location.reload();
-      });
-    }
-
     const initialStatus = document.body.dataset.status;
     const initialClosingSec = parseInt(document.body.dataset.closingSeconds || '10', 10);
     if (initialStatus === 'closing') {
@@ -1626,6 +1626,12 @@
 
           // Authoritative participant count & active peer list
           renderParticipantList(data.participants || [], data.participant_count);
+          // The participant view has no peer list; keep its counter current once the server
+          // discloses presence (after PIN authentication, or always in rooms without a PIN).
+          const participantCountVal = document.getElementById('participant-count-val');
+          if (participantCountVal && typeof data.participant_count === 'number' && (!data.pin_required || data.pin_authenticated)) {
+            participantCountVal.textContent = String(data.participant_count);
+          }
 
           if (page === 'participant' && data.pin_required && !data.pin_authenticated) {
             if (pinCard) {
@@ -1705,15 +1711,58 @@
     const progressFilename = document.getElementById('upload-filename');
     const progressPercent = document.getElementById('upload-percent');
     const progressFill = document.getElementById('progress-bar-fill');
-    const uploadError = document.getElementById('upload-error');
 
     let isUploading = false;
     const uploadQueue = [];
+    const uploadFailures = [];
+    const MAX_UPLOAD_RETRIES = 5;
+    let uploadError = document.getElementById('upload-error');
+
+    function ensureUploadErrorEl() {
+      if (!uploadError && progressContainer) {
+        uploadError = document.createElement('div');
+        uploadError.id = 'upload-error';
+        uploadError.className = 'form-hint';
+        uploadError.style.color = 'var(--accent-danger)';
+        uploadError.style.display = 'none';
+        progressContainer.appendChild(uploadError);
+      }
+      if (uploadError) uploadError.style.whiteSpace = 'pre-line';
+      return uploadError;
+    }
+
+    function renderUploadFailures() {
+      const el = ensureUploadErrorEl();
+      if (!el) return;
+      if (uploadFailures.length === 0) {
+        el.textContent = '';
+        el.style.display = 'none';
+        return;
+      }
+      const shown = uploadFailures.slice(-5);
+      const hidden = uploadFailures.length - shown.length;
+      el.textContent = (hidden > 0 ? `${hidden} earlier upload error(s)…\n` : '') + shown.join('\n');
+      el.style.display = 'block';
+      if (progressContainer) progressContainer.style.display = 'block';
+    }
+
+    function showUploadError(msg) {
+      uploadFailures.push(msg);
+      renderUploadFailures();
+      if (progressFill) {
+        progressFill.style.backgroundColor = 'var(--accent-danger)';
+      }
+    }
 
     function handleFiles(files) {
       if (isTerminated || !files || files.length === 0) return;
+      if (!isUploading) {
+        // A new batch starts with a clean error list; errors from the batch stay visible until then.
+        uploadFailures.length = 0;
+        renderUploadFailures();
+      }
       for (let i = 0; i < files.length; i++) {
-        uploadQueue.push(files[i]);
+        uploadQueue.push({ file: files[i], attempts: 0 });
       }
       if (!isUploading) {
         processNextUpload();
@@ -1723,20 +1772,52 @@
     function processNextUpload() {
       if (uploadQueue.length === 0) {
         isUploading = false;
-        if (progressContainer) progressContainer.style.display = 'none';
+        if (uploadFailures.length > 0) {
+          // Keep failures on screen instead of hiding the panel.
+          if (progressFilename) progressFilename.textContent = `${uploadFailures.length} upload(s) failed`;
+          if (progressPercent) progressPercent.textContent = '';
+          renderUploadFailures();
+        } else if (progressContainer) {
+          progressContainer.style.display = 'none';
+        }
         return;
       }
       isUploading = true;
-      const file = uploadQueue.shift();
-      uploadSingleFile(file);
+      uploadSingleFile(uploadQueue.shift());
     }
 
-    function uploadSingleFile(file) {
+    function parseUploadErrorMessage(xhr) {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (data && data.error) return data.error;
+      } catch (e) {}
+      return `Upload failed (HTTP ${xhr.status})`;
+    }
+
+    function parseRetryAfterSeconds(xhr) {
+      const raw = xhr.getResponseHeader('Retry-After');
+      const seconds = parseInt(raw || '', 10);
+      if (!Number.isFinite(seconds) || seconds <= 0) return 2;
+      return Math.min(seconds, 60);
+    }
+
+    function abortRemainingUploads(reason) {
+      const skipped = uploadQueue.length;
+      uploadQueue.length = 0;
+      if (skipped > 0) {
+        showUploadError(`${skipped} remaining file(s) were not uploaded: ${reason}`);
+      }
+    }
+
+    function uploadSingleFile(item) {
+      const file = item.file;
       if (progressContainer) progressContainer.style.display = 'block';
       if (progressFilename) progressFilename.textContent = file.name;
       if (progressPercent) progressPercent.textContent = '0%';
-      if (progressFill) progressFill.style.width = '0%';
-      if (uploadError) uploadError.style.display = 'none';
+      if (progressFill) {
+        progressFill.style.width = '0%';
+        progressFill.style.backgroundColor = '';
+      }
 
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `/api/v1/rooms/${encodeURIComponent(token)}/files?filename=${encodeURIComponent(file.name)}`);
@@ -1753,41 +1834,57 @@
 
       xhr.addEventListener('load', () => {
         if (xhr.status === 201 || xhr.status === 200) {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            addRecentActivity('upload', file.name, formatBytes(file.size));
-            if (data.file) {
-              // Immediately fetch updated file list
-              fetch(`/api/v1/rooms/${encodeURIComponent(token)}/files`, { cache: 'no-store' })
-                .then((r) => r.json())
-                .then((fData) => renderFileList(fData.files || []));
-            }
-          } catch (e) {}
+          addRecentActivity('upload', file.name, formatBytes(file.size));
+          // Immediately fetch updated file list
+          fetch(`/api/v1/rooms/${encodeURIComponent(token)}/files`, { cache: 'no-store' })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((fData) => {
+              if (fData) renderFileList(fData.files || []);
+            })
+            .catch(() => {});
           processNextUpload();
+          return;
         }
+
+        // Rate limited: wait as instructed by the server, then retry the same file.
+        if (xhr.status === 429 && item.attempts < MAX_UPLOAD_RETRIES && !isTerminated) {
+          item.attempts++;
+          const waitSec = parseRetryAfterSeconds(xhr);
+          if (progressFilename) progressFilename.textContent = `${file.name} — server busy, retrying in ${waitSec}s…`;
+          if (progressPercent) progressPercent.textContent = '';
+          setTimeout(() => {
+            if (isTerminated) {
+              showUploadError(`${file.name}: not uploaded, the room is no longer active.`);
+              abortRemainingUploads('the room is no longer active.');
+              processNextUpload();
+              return;
+            }
+            uploadSingleFile(item);
+          }, waitSec * 1000);
+          return;
+        }
+
+        const message = parseUploadErrorMessage(xhr);
+        showUploadError(`${file.name}: ${message}`);
+
+        // These responses mean no further upload to this room can succeed right now.
+        if (xhr.status === 401 || xhr.status === 404 || xhr.status === 409 || xhr.status === 410) {
+          abortRemainingUploads(message);
+        }
+        processNextUpload();
       });
 
-      xhr.onerror = () => {
+      const onTransportFailure = () => {
         showUploadError(`${file.name}: Upload failed or connection interrupted.`);
         processNextUpload();
       };
+      xhr.onerror = onTransportFailure;
+      xhr.onabort = onTransportFailure;
+      xhr.ontimeout = onTransportFailure;
 
       const formData = new FormData();
       formData.append('file', file, file.name);
       xhr.send(formData);
-    }
-
-    function showUploadError(msg) {
-      if (uploadError) {
-        uploadError.textContent = msg;
-        uploadError.style.display = 'block';
-      }
-      if (progressContainer) {
-        progressContainer.style.display = 'block';
-      }
-      if (progressFill) {
-        progressFill.style.backgroundColor = 'var(--accent-danger)';
-      }
     }
 
     if (dropzone && fileInput) {
@@ -1883,7 +1980,7 @@
     }
     
     // --------------------------------------------------------------------------
-    // Close Room Modal (Creator Desktop & Participant Mobile)
+    // Close Room Modal (Creator only: participants cannot close a room)
     // --------------------------------------------------------------------------
     const closeBtn = document.getElementById('close-room-btn');
     if (closeBtn) {
@@ -1911,10 +2008,10 @@
             if (data.status === 'closing') {
               startClosingCountdown(data.closing_remaining_seconds);
             } else {
-              showInactive('Room Closed', 'This temporary transfer room has been closed and all files purged.');
+              showInactive('Room Closed', 'This temporary transfer room has been closed. Its files are no longer accessible and are being deleted.');
             }
           } else if (res.status === 404 || res.status === 410) {
-            showInactive('Room Closed', 'This temporary transfer room has been closed and all files purged.');
+            showInactive('Room Closed', 'This temporary transfer room has been closed. Its files are no longer accessible and are being deleted.');
           } else {
             const errData = await res.json().catch(() => ({}));
             alert(errData.error || 'Failed to close room');
@@ -1922,74 +2019,13 @@
             confirmCloseBtn.textContent = 'Yes, Close Room';
           }
         } catch (e) {
+          // The request never got a response, so the room may still be open. Do not claim success.
           closeAllModals();
-          showInactive('Room Closed', 'This temporary transfer room has been closed and all files purged.');
+          alert('Could not reach the server. The room has NOT been closed. Check your connection and try again.');
+          confirmCloseBtn.disabled = false;
+          confirmCloseBtn.textContent = 'Yes, Close Room';
         }
       });
-    }
-
-    // Participant Mobile Close Room Modal & Confirmation
-    const participantCloseBtn = document.getElementById('participant-close-btn');
-    const closeConfirmModal = document.getElementById('close-confirm-modal');
-    const participantModalClose = document.getElementById('participant-modal-close');
-    const participantCancelClose = document.getElementById('participant-cancel-close-btn');
-    const participantConfirmClose = document.getElementById('participant-confirm-close-btn');
-
-    if (participantCloseBtn && closeConfirmModal) {
-      participantCloseBtn.addEventListener('click', () => {
-        closeConfirmModal.style.display = 'flex';
-      });
-
-      if (participantModalClose) {
-        participantModalClose.addEventListener('click', () => {
-          closeConfirmModal.style.display = 'none';
-        });
-      }
-
-      if (participantCancelClose) {
-        participantCancelClose.addEventListener('click', () => {
-          closeConfirmModal.style.display = 'none';
-        });
-      }
-
-      closeConfirmModal.addEventListener('click', (e) => {
-        if (e.target === closeConfirmModal) {
-          closeConfirmModal.style.display = 'none';
-        }
-      });
-
-      if (participantConfirmClose) {
-        participantConfirmClose.addEventListener('click', async () => {
-          participantConfirmClose.disabled = true;
-          participantConfirmClose.textContent = t.closing || 'Closing room…';
-
-          try {
-            const res = await fetch(`/api/v1/rooms/${encodeURIComponent(token)}/close`, {
-              method: 'POST',
-            });
-            closeConfirmModal.style.display = 'none';
-
-            if (res.ok) {
-              const data = await res.json().catch(() => ({}));
-              if (data.status === 'closing') {
-                startClosingCountdown(data.closing_remaining_seconds);
-              } else {
-                showInactive('Room Closed', 'This temporary room is no longer accessible.');
-              }
-            } else if (res.status === 404 || res.status === 410) {
-              showInactive('Room Closed', 'This temporary room is no longer accessible.');
-            } else {
-              const errData = await res.json().catch(() => ({}));
-              alert(errData.error || t.closeError || 'Failed to close room');
-              participantConfirmClose.disabled = false;
-              participantConfirmClose.textContent = t.confirmBtn || 'Yes, Close Room';
-            }
-          } catch (e) {
-            closeConfirmModal.style.display = 'none';
-            showInactive('Room Closed', 'This temporary room is no longer accessible.');
-          }
-        });
-      }
     }
 
     // --------------------------------------------------------------------------
@@ -2121,6 +2157,8 @@
         pinInput.focus();
       });
       pinInput.addEventListener('input', () => {
+        const digits = pinInput.value.replace(/[^0-9]/g, '');
+        if (digits !== pinInput.value) pinInput.value = digits;
         syncPinSlots();
       });
       pinInput.addEventListener('focus', syncPinSlots);
@@ -2142,7 +2180,18 @@
       pinForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const pinVal = pinInput ? pinInput.value.trim() : '';
-        if (!pinVal) return;
+        if (!/^[0-9]{4,8}$/.test(pinVal)) {
+          if (pinError) {
+            const formatMsg = 'PIN must be 4 to 8 digits.';
+            if (pinErrorText) {
+              pinErrorText.textContent = formatMsg;
+            } else {
+              pinError.textContent = formatMsg;
+            }
+            pinError.style.display = 'flex';
+          }
+          return;
+        }
 
         if (unlockBtn) {
           unlockBtn.disabled = true;
@@ -2365,7 +2414,11 @@
     const sendTextBtn = document.getElementById('send-text-btn');
     const textSizeCounter = document.getElementById('text-size-counter');
     const textComposeError = document.getElementById('text-compose-error');
-    const maxTextSize = parseInt(document.body.dataset.maxTextSize || '65536', 10);
+    const maxTextSize = parseInt(document.body.dataset.maxTextSize || '', 10) || 65536;
+    if (textInput) {
+      // A message of N bytes never has more than N characters, so this never blocks a valid message.
+      textInput.setAttribute('maxlength', String(maxTextSize));
+    }
 
     function updateTextCounter() {
       if (!textInput || !textSizeCounter) return;
@@ -2403,8 +2456,9 @@
 
     async function submitText() {
       if (!textInput || isTerminated || !token) return;
-      const content = textInput.value.trim();
-      if (!content) return;
+      // Send the text exactly as entered: leading indentation and trailing newlines are content.
+      const content = textInput.value;
+      if (!content.trim()) return;
 
       const bytes = new Blob([content]).size;
       if (bytes > maxTextSize) {

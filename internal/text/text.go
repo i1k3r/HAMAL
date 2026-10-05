@@ -21,8 +21,8 @@ var (
 type Text struct {
 	ID              string    `json:"id"`
 	RoomID          string    `json:"room_id"`
-	SenderType      string    `json:"sender_type"`                 // "client" or "server"
-	SenderSessionID *string   `json:"sender_session_id,omitempty"` // nullable for server
+	SenderType      string    `json:"sender_type"` // "client" or "server"
+	SenderSessionID *string   `json:"-"`           // server-side only; clients receive is_self instead
 	Content         string    `json:"content"`
 	SizeBytes       int64     `json:"size_bytes"`
 	CreatedAt       time.Time `json:"created_at"`
@@ -89,15 +89,10 @@ func (s *Store) CreateClientText(ctx context.Context, roomID, senderSessionID, c
 		return Text{}, ErrRoomInactive
 	}
 
-	if maxTextsPerRoom > 0 {
-		var currentCount int
-		err = tx.QueryRowContext(ctx, "SELECT COUNT(id) FROM texts WHERE room_id = ?", roomID).Scan(&currentCount)
-		if err != nil {
-			return Text{}, fmt.Errorf("query text count: %w", err)
-		}
-		if currentCount >= maxTextsPerRoom {
-			return Text{}, ErrTextLimitReached
-		}
+	// Only client messages can exhaust the room capacity: when the room is full, the oldest
+	// system messages are evicted to make room for user text.
+	if err := makeRoomForText(ctx, tx, roomID, maxTextsPerRoom); err != nil {
+		return Text{}, err
 	}
 
 	now := time.Now().UTC()
@@ -137,6 +132,47 @@ func (s *Store) CreateClientText(ctx context.Context, roomID, senderSessionID, c
 	}, nil
 }
 
+// makeRoomForText enforces the per-room message capacity before one more message is inserted.
+// Capacity is shared, but only client messages hold it permanently: when the room is
+// full the oldest system ("server") messages are evicted, and ErrTextLimitReached is returned only
+// when there is no system message left to evict.
+func makeRoomForText(ctx context.Context, tx *sql.Tx, roomID string, maxTextsPerRoom int) error {
+	if maxTextsPerRoom <= 0 {
+		return nil
+	}
+
+	var total, serverCount int
+	err := tx.QueryRowContext(
+		ctx,
+		"SELECT COUNT(id), COALESCE(SUM(CASE WHEN sender_type = 'server' THEN 1 ELSE 0 END), 0) FROM texts WHERE room_id = ?",
+		roomID,
+	).Scan(&total, &serverCount)
+	if err != nil {
+		return fmt.Errorf("query text count: %w", err)
+	}
+	if total < maxTextsPerRoom {
+		return nil
+	}
+
+	excess := total - maxTextsPerRoom + 1
+	if serverCount < excess {
+		return ErrTextLimitReached
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		DELETE FROM texts WHERE rowid IN (
+			SELECT rowid FROM texts
+			WHERE room_id = ? AND sender_type = 'server'
+			ORDER BY created_at ASC, rowid ASC
+			LIMIT ?
+		);
+	`, roomID, excess)
+	if err != nil {
+		return fmt.Errorf("evict oldest system messages: %w", err)
+	}
+	return nil
+}
+
 func (s *Store) CreateServerText(ctx context.Context, roomID, content string, maxTextsPerRoom int) (Text, error) {
 	if strings.TrimSpace(content) == "" {
 		return Text{}, ErrTextEmpty
@@ -164,15 +200,10 @@ func (s *Store) CreateServerText(ctx context.Context, roomID, content string, ma
 		return Text{}, fmt.Errorf("query room status: %w", err)
 	}
 
-	if maxTextsPerRoom > 0 {
-		var currentCount int
-		err = tx.QueryRowContext(ctx, "SELECT COUNT(id) FROM texts WHERE room_id = ?", roomID).Scan(&currentCount)
-		if err != nil {
-			return Text{}, fmt.Errorf("query text count: %w", err)
-		}
-		if currentCount >= maxTextsPerRoom {
-			return Text{}, ErrTextLimitReached
-		}
+	// System messages never displace user text: at capacity they rotate out the oldest system
+	// message, or are dropped when the room holds only client messages.
+	if err := makeRoomForText(ctx, tx, roomID, maxTextsPerRoom); err != nil {
+		return Text{}, err
 	}
 
 	now := time.Now().UTC()

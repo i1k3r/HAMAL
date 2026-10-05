@@ -11,24 +11,24 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode"
 )
 
 var (
-	ErrInvalidPIN   = errors.New("PIN must be between 4 and 8 characters")
+	ErrInvalidPIN   = errors.New("PIN must be 4 to 8 digits")
 	ErrRoomLocked   = errors.New("room is temporarily locked due to too many failed PIN attempts")
 	ErrIncorrectPIN = errors.New("incorrect PIN")
 	ErrPINRequired  = errors.New("PIN authentication required")
 )
 
-// ValidatePIN validates that the PIN is between 4 and 8 characters long and contains valid characters.
+// ValidatePIN validates that the PIN consists of 4 to 8 ASCII digits. The room creation form and
+// the participant PIN form enforce the same rule.
 func ValidatePIN(raw string) error {
 	pin := strings.TrimSpace(raw)
 	if len(pin) < 4 || len(pin) > 8 {
 		return ErrInvalidPIN
 	}
 	for _, r := range pin {
-		if unicode.IsControl(r) || r == 0 || r > 126 {
+		if r < '0' || r > '9' {
 			return ErrInvalidPIN
 		}
 	}

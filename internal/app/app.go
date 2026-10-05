@@ -97,8 +97,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 
 	var trustedProxies []*net.IPNet
 	for _, proxy := range cfg.TrustedProxies {
-		_, ipNet, err := net.ParseCIDR(strings.TrimSpace(proxy))
-		if err == nil && ipNet != nil {
+		if ipNet, err := config.ParseTrustedProxy(proxy); err == nil {
 			trustedProxies = append(trustedProxies, ipNet)
 		}
 	}
@@ -299,7 +298,7 @@ func (a *App) checkRateLimit(w http.ResponseWriter, r *http.Request, limiter *IP
 func (a *App) securityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
-		h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self';")
+		h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self';")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer")
@@ -466,6 +465,19 @@ func (a *App) getClientSessionID(r *http.Request, roomID string) string {
 	return ""
 }
 
+// maxSmallRequestBody bounds the body of small JSON/form endpoints (room creation, PIN auth,
+// share creation). File uploads and text messages have their own, larger limits.
+const maxSmallRequestBody = 16 << 10
+
+// maxClientSessionIDLength bounds client-supplied session identifiers.
+const maxClientSessionIDLength = 128
+
+// isBodyTooLarge reports whether err was caused by an http.MaxBytesReader limit.
+func isBodyTooLarge(err error) bool {
+	var maxBytesErr *http.MaxBytesError
+	return errors.As(err, &maxBytesErr)
+}
+
 func generateEphemeralSessionID() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)
@@ -551,6 +563,7 @@ func (a *App) routes() (http.Handler, error) {
 					"PinRequired":        false,
 					"IsLocked":           false,
 					"Files":              []file.File{},
+					"MaxTextSize":        a.cfg.MaxTextSize,
 					"GlobalShareEnabled": a.cfg.GlobalShareEnabled,
 					"Shares":             []share.Share{},
 				})
@@ -648,10 +661,14 @@ func (a *App) routes() (http.Handler, error) {
 			return
 		}
 
-		a.trackParticipantFromRequest(r, rm, role)
-		activeCount := a.getActiveParticipantCount(rm.ID)
-
 		isAuth := a.isParticipantAuthenticated(r.Context(), rm, r)
+
+		// Presence is recorded and disclosed only after PIN authentication (or in rooms without a PIN).
+		activeCount := 0
+		if isAuth {
+			a.trackParticipantFromRequest(r, rm, role)
+			activeCount = a.getActiveParticipantCount(rm.ID)
+		}
 
 		var filesList []file.File
 		var textsList []text.Text
@@ -703,14 +720,23 @@ func (a *App) routes() (http.Handler, error) {
 			PIN        string `json:"pin"`
 		}
 
+		r.Body = http.MaxBytesReader(w, r.Body, maxSmallRequestBody)
+
 		contentType := r.Header.Get("Content-Type")
 		if strings.HasPrefix(contentType, "application/json") {
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err.Error() != "EOF" {
+				if isBodyTooLarge(err) {
+					writeJSONError(w, "request body too large", http.StatusRequestEntityTooLarge)
+					return
+				}
 				writeJSONError(w, "invalid request payload", http.StatusBadRequest)
 				return
 			}
 		} else {
-			_ = r.ParseForm()
+			if err := r.ParseForm(); err != nil && isBodyTooLarge(err) {
+				writeJSONError(w, "request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
 			if val := r.FormValue("ttl_seconds"); val != "" {
 				parsed, err := strconv.Atoi(val)
 				if err == nil {
@@ -733,7 +759,7 @@ func (a *App) routes() (http.Handler, error) {
 		created, err := a.rooms.Create(r.Context(), ttl, a.cfg.MaxRoomSize, a.cfg.MaxFileSize, a.cfg.MaxFilesPerRoom, req.PIN)
 		if err != nil {
 			if errors.Is(err, room.ErrInvalidPIN) {
-				writeJSONError(w, "PIN must be between 4 and 8 characters", http.StatusBadRequest)
+				writeJSONError(w, "PIN must be 4 to 8 digits", http.StatusBadRequest)
 				return
 			}
 			a.logger.Error("failed to create room", "error", err)
@@ -771,14 +797,23 @@ func (a *App) routes() (http.Handler, error) {
 			PIN string `json:"pin"`
 		}
 
+		r.Body = http.MaxBytesReader(w, r.Body, maxSmallRequestBody)
+
 		contentType := r.Header.Get("Content-Type")
 		if strings.HasPrefix(contentType, "application/json") {
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err.Error() != "EOF" {
+				if isBodyTooLarge(err) {
+					writeJSONError(w, "request body too large", http.StatusRequestEntityTooLarge)
+					return
+				}
 				writeJSONError(w, "invalid request payload", http.StatusBadRequest)
 				return
 			}
 		} else {
-			_ = r.ParseForm()
+			if err := r.ParseForm(); err != nil && isBodyTooLarge(err) {
+				writeJSONError(w, "request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
 			req.PIN = r.FormValue("pin")
 		}
 
@@ -841,6 +876,24 @@ func (a *App) routes() (http.Handler, error) {
 
 		a.trackParticipantFromRequest(r, rm, room.RoleParticipant)
 
+		respondAuthenticated := func() {
+			if !strings.HasPrefix(contentType, "application/json") && strings.Contains(r.Header.Get("Accept"), "text/html") {
+				http.Redirect(w, r, "/r/"+token, http.StatusSeeOther)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"status": "authenticated",
+			})
+		}
+
+		// Rooms without a PIN need no session, and a client that already holds a valid session
+		// keeps it. Neither case may add session rows or "Client connected" messages.
+		if !rm.PinRequired || a.isParticipantAuthenticated(r.Context(), rm, r) {
+			respondAuthenticated()
+			return
+		}
+
 		sessionToken, err := a.rooms.CreateSession(r.Context(), rm.ID, rm.ExpiresAt)
 		if err != nil {
 			a.logger.Error("failed to create participant session", "error", err)
@@ -866,15 +919,7 @@ func (a *App) routes() (http.Handler, error) {
 
 		_, _ = a.texts.CreateServerText(r.Context(), rm.ID, "Client connected", a.cfg.MaxTextsPerRoom)
 
-		if !strings.HasPrefix(contentType, "application/json") && strings.Contains(r.Header.Get("Accept"), "text/html") {
-			http.Redirect(w, r, "/r/"+token, http.StatusSeeOther)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"status": "authenticated",
-		})
+		respondAuthenticated()
 	})
 
 	// Phase 4: Creator unlock endpoint
@@ -936,11 +981,17 @@ func (a *App) routes() (http.Handler, error) {
 			remainingSeconds = 0
 		}
 
-		a.trackParticipantFromRequest(r, rm, role)
-		activeCount := a.getActiveParticipantCount(rm.ID)
-		activeList := a.getActiveParticipants(rm.ID)
-
 		isAuth := (role == room.RoleCreator) || a.isParticipantAuthenticated(r.Context(), rm, r)
+
+		// Participant IP/device details are returned only to the creator or to participants who
+		// have passed PIN authentication; unauthenticated callers are not recorded as present.
+		activeCount := 0
+		activeList := []ParticipantRecord{}
+		if isAuth {
+			a.trackParticipantFromRequest(r, rm, role)
+			activeList = a.getActiveParticipants(rm.ID)
+			activeCount = len(activeList)
+		}
 
 		var closeDeadlineStr string
 		if rm.CloseDeadline != nil {
@@ -984,50 +1035,20 @@ func (a *App) routes() (http.Handler, error) {
 			return
 		}
 
-		if role == room.RoleCreator {
-			_, _ = a.texts.CreateServerText(r.Context(), rm.ID, "Room closed", a.cfg.MaxTextsPerRoom)
-			err = a.rooms.CloseByRoomID(r.Context(), rm.ID)
-			if err != nil && !errors.Is(err, room.ErrRoomClosed) {
-				writeJSONError(w, "failed to close room", http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"status": "closed", "remaining_seconds": 0})
+		// Closing a room permanently deletes its files and texts, so it is a creator-only action.
+		if role != room.RoleCreator {
+			writeJSONError(w, "only the room creator can close this room", http.StatusForbidden)
 			return
 		}
 
-		if role == room.RoleParticipant && rm.PinRequired {
-			if !a.isParticipantAuthenticated(r.Context(), rm, r) {
-				writeJSONError(w, "PIN authentication required", http.StatusUnauthorized)
-				return
-			}
-		}
-
-		closingRoom, err := a.rooms.StartClosing(r.Context(), rm.ID, 10*time.Second)
-		if err != nil {
-			if errors.Is(err, room.ErrRoomClosed) {
-				w.Header().Set("Content-Type", "application/json")
-				_ = json.NewEncoder(w).Encode(map[string]any{"status": "closed", "remaining_seconds": 0})
-				return
-			}
+		_, _ = a.texts.CreateServerText(r.Context(), rm.ID, "Room closed", a.cfg.MaxTextsPerRoom)
+		err = a.rooms.CloseByRoomID(r.Context(), rm.ID)
+		if err != nil && !errors.Is(err, room.ErrRoomClosed) {
 			writeJSONError(w, "failed to close room", http.StatusInternalServerError)
 			return
 		}
-
-		_, _ = a.texts.CreateServerText(r.Context(), rm.ID, "Room is closing", a.cfg.MaxTextsPerRoom)
-
-		var closeDeadlineStr string
-		if closingRoom.CloseDeadline != nil {
-			closeDeadlineStr = closingRoom.CloseDeadline.Format(time.RFC3339)
-		}
-
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"status":                    closingRoom.Status,
-			"close_deadline":            closeDeadlineStr,
-			"closing_remaining_seconds": closingRoom.ClosingRemainingSeconds(),
-			"remaining_seconds":         closingRoom.ClosingRemainingSeconds(),
-		})
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": "closed", "remaining_seconds": 0})
 	})
 
 	mux.HandleFunc("GET /api/v1/rooms/{token}/qr.svg", func(w http.ResponseWriter, r *http.Request) {
@@ -1096,14 +1117,14 @@ func (a *App) routes() (http.Handler, error) {
 			return
 		}
 
-		a.trackParticipantFromRequest(r, rm, role)
-
 		if role == room.RoleParticipant && rm.PinRequired {
 			if !a.isParticipantAuthenticated(r.Context(), rm, r) {
 				writeJSONError(w, "PIN authentication required", http.StatusUnauthorized)
 				return
 			}
 		}
+
+		a.trackParticipantFromRequest(r, rm, role)
 
 		// Request body bounded to MaxFileSize + 10MB envelope
 		r.Body = http.MaxBytesReader(w, r.Body, rm.MaxFileSize+10<<20)
@@ -1409,10 +1430,10 @@ func (a *App) routes() (http.Handler, error) {
 
 		clientSessionID := a.getClientSessionID(r, rm.ID)
 		if clientSessionID == "" {
-			if req.ClientSessionID != "" {
-				clientSessionID = req.ClientSessionID
-			} else if req.SenderSessionID != "" {
-				clientSessionID = req.SenderSessionID
+			if sess := strings.TrimSpace(req.ClientSessionID); sess != "" && len(sess) <= maxClientSessionIDLength {
+				clientSessionID = sess
+			} else if sess := strings.TrimSpace(req.SenderSessionID); sess != "" && len(sess) <= maxClientSessionIDLength {
+				clientSessionID = sess
 			} else {
 				clientSessionID = generateEphemeralSessionID()
 			}
@@ -1549,7 +1570,11 @@ func (a *App) routes() (http.Handler, error) {
 			var payload struct {
 				TTLSeconds int `json:"ttl_seconds"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&payload); err == nil && payload.TTLSeconds > 0 {
+			r.Body = http.MaxBytesReader(w, r.Body, maxSmallRequestBody)
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil && isBodyTooLarge(err) {
+				writeJSONError(w, "request body too large", http.StatusRequestEntityTooLarge)
+				return
+			} else if err == nil && payload.TTLSeconds > 0 {
 				requestedTTL = time.Duration(payload.TTLSeconds) * time.Second
 			}
 		}

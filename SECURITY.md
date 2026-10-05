@@ -6,10 +6,16 @@ HAMAL is designed as private, self-hosted file transfer software. Operators cont
 
 Core security features include:
 - Ephemeral, time-limited room lifecycles with automatic purge upon expiry.
-- Ephemeral cryptographic tokens separating creator controls from participant access.
-- Optional 4–8 character PIN protection with exponential rate limiting and lockout.
+- Ephemeral cryptographic tokens separating creator controls from participant access. Closing a room is a creator-only action.
+- Optional 4–8 digit PIN protection with exponential rate limiting and lockout. Files, text and the list of connected devices are disclosed only after PIN authentication.
 - Pure local network streaming without cloud relay or persistent staging retention.
 - Zero credential logging: tokens, PINs, and sensitive authorization headers are never logged.
+
+## What HAMAL does not do
+
+- Files and text are **not encrypted at rest**; they are stored as plain files and SQLite rows under `/data` until the room expires or is closed.
+- HAMAL serves plain HTTP. Traffic is encrypted in transit only if the operator places it behind an HTTPS reverse proxy.
+- Room links are bearer credentials: anyone who obtains a creator or participant link has that role's access.
 
 ## Secret Handling
 

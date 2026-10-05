@@ -11,9 +11,7 @@
   <link rel="icon" type="image/svg+xml" href="/static/brand/hamal-app-icon.svg">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/static/brand/hamal-app-icon.svg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/fonts/fonts.css">
   <link rel="stylesheet" href="/static/site.css">
   <script>
     (function() {
@@ -189,11 +187,11 @@
             </div>
             <div class="card-title-group">
               <h2 class="card-heading">Room Settings</h2>
-              <p class="card-subheading">Set a lifespan and an optional PIN code. A dashboard and QR code will be generated for you.</p>
+              <p class="card-subheading">Set a lifespan and an optional 4–8 digit PIN code. A dashboard and QR code will be generated for you.</p>
             </div>
           </div>
 
-          <form id="create-room-form" method="POST" action="/api/v1/rooms" class="room-form">
+          <form id="create-room-form" method="POST" action="/api/v1/rooms" class="room-form" novalidate>
             <div class="form-columns-grid">
               <!-- Left Column: TTL Field -->
               <div class="form-column">
@@ -237,7 +235,7 @@
                   <span>Participant PIN (Optional)</span>
                 </label>
                 <div class="field-input-wrapper">
-                  <input type="password" id="pin-input" name="pin" maxlength="8" placeholder="4–8 digits or characters" autocomplete="off" class="field-input font-mono">
+                  <input type="password" id="pin-input" name="pin" maxlength="8" inputmode="numeric" pattern="[0-9]{4,8}" placeholder="4–8 digits" autocomplete="off" class="field-input font-mono">
                   <button type="button" id="pin-toggle-btn" class="input-action-btn" title="Toggle PIN visibility" aria-label="Toggle PIN visibility">
                     <svg id="pin-eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>

@@ -8,11 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -52,6 +54,11 @@ type Store struct {
 	maxTotalStorage int64
 	minFreeSpace    int64
 	freeSpaceFn     func(path string) (uint64, error)
+
+	// usageMu makes "read committed usage from SQLite + change reservations" one atomic step.
+	// Every Acquire/Grow and every commit (INSERT + Release) happens under it, so bytes moving
+	// from an in-flight reservation into the files table are never missed or counted twice.
+	usageMu sync.Mutex
 }
 
 func NewStore(db *sql.DB, paths storage.Paths, quota *QuotaManager, opts ...StoreOptions) *Store {
@@ -267,6 +274,150 @@ func (s *Store) OpenStorageFile(storageID string) (*os.File, error) {
 	return file, nil
 }
 
+// maxContentTypeLength bounds the client-declared media type that is stored and echoed back.
+const maxContentTypeLength = 255
+
+// SanitizeContentType validates a client-declared Content-Type and returns it in canonical
+// "type/subtype" form (keeping only a charset parameter). Empty, oversized or malformed values
+// return "" so the caller falls back to content sniffing.
+func SanitizeContentType(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || len(trimmed) > maxContentTypeLength {
+		return ""
+	}
+	mediaType, params, err := mime.ParseMediaType(trimmed)
+	if err != nil || !strings.Contains(mediaType, "/") {
+		return ""
+	}
+	if charset := params["charset"]; charset != "" {
+		if formatted := mime.FormatMediaType(mediaType, map[string]string{"charset": charset}); formatted != "" && len(formatted) <= maxContentTypeLength {
+			return formatted
+		}
+	}
+	return mediaType
+}
+
+// checkFreeSpace enforces the minimum free-space floor, treating additionalBytes as already consumed.
+func (s *Store) checkFreeSpace(additionalBytes int64) error {
+	if s.minFreeSpace <= 0 || s.freeSpaceFn == nil {
+		return nil
+	}
+	freeBytes, err := s.freeSpaceFn(s.paths.DataDir)
+	if err != nil {
+		return fmt.Errorf("check filesystem free space: %w", err)
+	}
+	if additionalBytes < 0 {
+		additionalBytes = 0
+	}
+	if freeBytes <= uint64(s.minFreeSpace)+uint64(additionalBytes) {
+		return ErrInsufficientStorage
+	}
+	return nil
+}
+
+// committedUsage reads the committed (status = 'ready') room usage, room file count and global
+// usage from SQLite. Callers must hold usageMu.
+func (s *Store) committedUsage(ctx context.Context, roomID string) (roomUsage int64, roomFiles int, globalUsage int64, err error) {
+	roomUsage, roomFiles, err = s.GetRoomUsageAndCount(ctx, roomID)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	if s.maxTotalStorage > 0 {
+		globalUsage, err = s.GetTotalUsage(ctx)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+	}
+	return roomUsage, roomFiles, globalUsage, nil
+}
+
+// availableBytes returns how many more bytes may be reserved for roomID given committed usage and
+// all in-flight reservations. roomLimited reports whether the room quota is the binding limit.
+// Callers must hold usageMu.
+func (s *Store) availableBytes(roomID string, roomUsage, maxRoomSize, globalUsage int64) (available int64, roomLimited bool) {
+	available = maxRoomSize - roomUsage - s.quota.GetActiveReserved(roomID)
+	roomLimited = true
+	if s.maxTotalStorage > 0 {
+		if globalAvailable := s.maxTotalStorage - globalUsage - s.quota.GetTotalActiveReserved(); globalAvailable < available {
+			available = globalAvailable
+			roomLimited = false
+		}
+	}
+	return available, roomLimited
+}
+
+// acquireReservation reserves a file slot and up to wantBytes for a new upload, validated against
+// committed usage read in the same critical section.
+func (s *Store) acquireReservation(ctx context.Context, roomID string, wantBytes, maxRoomSize int64, maxFiles int) (string, int64, error) {
+	s.usageMu.Lock()
+	defer s.usageMu.Unlock()
+
+	roomUsage, roomFiles, globalUsage, err := s.committedUsage(ctx, roomID)
+	if err != nil {
+		return "", 0, err
+	}
+	if roomUsage >= maxRoomSize {
+		return "", 0, ErrQuotaExceeded
+	}
+	if s.maxTotalStorage > 0 && globalUsage >= s.maxTotalStorage {
+		return "", 0, ErrGlobalStorageExceeded
+	}
+	if maxFiles > 0 && roomFiles+s.quota.GetActiveFiles(roomID)+1 > maxFiles {
+		return "", 0, ErrFileLimitReached
+	}
+
+	available, roomLimited := s.availableBytes(roomID, roomUsage, maxRoomSize, globalUsage)
+	if available <= 0 {
+		if roomLimited {
+			return "", 0, ErrQuotaExceeded
+		}
+		return "", 0, ErrGlobalStorageExceeded
+	}
+	if wantBytes > available {
+		wantBytes = available
+	}
+
+	resID, err := s.quota.Acquire(roomID, wantBytes, roomUsage, maxRoomSize, roomFiles, maxFiles, globalUsage, s.maxTotalStorage)
+	if err != nil {
+		return "", 0, err
+	}
+	return resID, wantBytes, nil
+}
+
+// growReservation extends an in-flight reservation by at least needed and at most preferred bytes.
+// Committed usage and free space are re-read on every call, so uploads that finished after this
+// one started are counted and the free-space floor holds for the whole transfer.
+func (s *Store) growReservation(ctx context.Context, resID, roomID string, needed, preferred, maxRoomSize int64) (int64, error) {
+	s.usageMu.Lock()
+	defer s.usageMu.Unlock()
+
+	if err := s.checkFreeSpace(needed); err != nil {
+		return 0, err
+	}
+
+	roomUsage, _, globalUsage, err := s.committedUsage(ctx, roomID)
+	if err != nil {
+		return 0, err
+	}
+
+	available, roomLimited := s.availableBytes(roomID, roomUsage, maxRoomSize, globalUsage)
+	if available < needed {
+		if roomLimited {
+			return 0, ErrQuotaExceeded
+		}
+		return 0, ErrGlobalStorageExceeded
+	}
+	granted := preferred
+	if granted > available {
+		granted = available
+	}
+
+	if err := s.quota.Grow(resID, granted, roomUsage, maxRoomSize, globalUsage, s.maxTotalStorage); err != nil {
+		return 0, err
+	}
+	return granted, nil
+}
+
 // StreamUpload streams an incoming file directly into /data/staging, validates limits,
 // atomically finalizes to /data/files, and records the file metadata in SQLite.
 func (s *Store) StreamUpload(
@@ -281,40 +432,11 @@ func (s *Store) StreamUpload(
 	maxFiles int,
 ) (*File, error) {
 	// 1. Filesystem Minimum Free Space check
-	if s.minFreeSpace > 0 && s.freeSpaceFn != nil {
-		freeBytes, err := s.freeSpaceFn(s.paths.DataDir)
-		if err != nil {
-			return nil, fmt.Errorf("check filesystem free space: %w", err)
-		}
-		if freeBytes <= uint64(s.minFreeSpace) {
-			return nil, ErrInsufficientStorage
-		}
-	}
-
-	// 2. Room file count and quota check
-	currentUsage, count, err := s.GetRoomUsageAndCount(ctx, roomID)
-	if err != nil {
+	if err := s.checkFreeSpace(0); err != nil {
 		return nil, err
 	}
 
-	remainingRoomQuota := maxRoomSize - currentUsage
-	if remainingRoomQuota <= 0 {
-		return nil, ErrQuotaExceeded
-	}
-
-	// 3. Global storage usage check
-	var currentGlobalUsage int64
-	if s.maxTotalStorage > 0 {
-		currentGlobalUsage, err = s.GetTotalUsage(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if currentGlobalUsage >= s.maxTotalStorage {
-			return nil, ErrGlobalStorageExceeded
-		}
-	}
-
-	// 4. Calculate initial bounded reservation
+	// 2. Calculate initial bounded reservation
 	const InitialQuotaChunk = int64(64 * 1024)
 	const QuotaGrowthChunk = int64(1024 * 1024)
 
@@ -322,25 +444,15 @@ func (s *Store) StreamUpload(
 	if declaredSize > 0 && declaredSize < initialReservation {
 		initialReservation = declaredSize
 	}
-	if initialReservation > remainingRoomQuota {
-		initialReservation = remainingRoomQuota
-	}
 	if initialReservation > maxFileSize {
 		initialReservation = maxFileSize
 	}
-	if s.maxTotalStorage > 0 {
-		remainingGlobal := s.maxTotalStorage - currentGlobalUsage
-		if remainingGlobal > 0 && initialReservation > remainingGlobal {
-			initialReservation = remainingGlobal
-		}
-	}
 
-	// 5. Acquire atomic initial quota and file slot reservation
-	resID, err := s.quota.Acquire(roomID, initialReservation, currentUsage, maxRoomSize, count, maxFiles, currentGlobalUsage, s.maxTotalStorage)
+	// 3. Acquire atomic initial quota and file slot reservation against fresh committed usage
+	resID, reservedBytes, err := s.acquireReservation(ctx, roomID, initialReservation, maxRoomSize, maxFiles)
 	if err != nil {
 		return nil, err
 	}
-	reservedBytes := initialReservation
 	resReleased := false
 	defer func() {
 		if !resReleased {
@@ -395,25 +507,15 @@ func (s *Store) StreamUpload(
 				if needed > growDelta {
 					growDelta = needed
 				}
-				// Clamp growDelta to available headroom so we don't over-request beyond available room/global limits
-				remainingInRoom := maxRoomSize - (currentUsage + reservedBytes)
-				if remainingInRoom >= needed && growDelta > remainingInRoom {
-					growDelta = remainingInRoom
-				}
-				if s.maxTotalStorage > 0 {
-					remainingInGlobal := s.maxTotalStorage - (currentGlobalUsage + reservedBytes)
-					if remainingInGlobal >= needed && growDelta > remainingInGlobal {
-						growDelta = remainingInGlobal
-					}
-				}
 				if remainingInFile := maxFileSize - reservedBytes; remainingInFile >= needed && growDelta > remainingInFile {
 					growDelta = remainingInFile
 				}
 
-				if err := s.quota.Grow(resID, growDelta, currentUsage, maxRoomSize, currentGlobalUsage, s.maxTotalStorage); err != nil {
+				granted, err := s.growReservation(ctx, resID, roomID, needed, growDelta, maxRoomSize)
+				if err != nil {
 					return nil, err
 				}
-				reservedBytes += growDelta
+				reservedBytes += granted
 			}
 
 			if !headerCollected {
@@ -456,7 +558,7 @@ func (s *Store) StreamUpload(
 		s.quota.Shrink(resID, written)
 	}
 
-	contentType := strings.TrimSpace(declaredContentType)
+	contentType := SanitizeContentType(declaredContentType)
 	if contentType == "" || contentType == "application/octet-stream" {
 		if len(headerBuf) > 0 {
 			contentType = http.DetectContentType(headerBuf)
@@ -476,15 +578,19 @@ func (s *Store) StreamUpload(
 		INSERT INTO files (id, room_id, storage_id, original_filename, size_bytes, content_type, status, created_at, completed_at)
 		VALUES (?, ?, ?, ?, ?, ?, 'ready', ?, ?);
 	`
+	// Commit and release under usageMu: concurrent uploads then see these bytes either as an
+	// in-flight reservation or as committed usage, never as neither and never as both.
+	s.usageMu.Lock()
 	_, err = s.db.ExecContext(ctx, insertQuery, fileID, roomID, storageID, filename, written, contentType, now, now)
+	if err == nil {
+		s.quota.Release(resID)
+		resReleased = true
+	}
+	s.usageMu.Unlock()
 	if err != nil {
 		_ = os.Remove(finalPath)
 		return nil, fmt.Errorf("record file in database: %w", err)
 	}
-
-	// Release in-flight reservation immediately after successful DB commit
-	s.quota.Release(resID)
-	resReleased = true
 
 	return &File{
 		ID:               fileID,

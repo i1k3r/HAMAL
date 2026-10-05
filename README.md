@@ -7,10 +7,10 @@
 
 **Fast, private, temporary file and clipboard transfer.**
 
-[![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat-square&logo=go)](https://golang.org)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker)](Dockerfile)
 [![Unraid](https://img.shields.io/badge/Unraid-Compatible-E16527?style=flat-square)](unraid-template.xml)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/License-Source--Available-blue.svg?style=flat-square)](LICENSE)
 
 </div>
 
@@ -30,7 +30,7 @@ HAMAL is built around short-lived transfer rooms rather than permanent storage. 
 2. Optionally protect it with a PIN.
 3. Scan the QR code or open the local room link.
 4. Transfer files or send temporary text between connected devices.
-5. Let the room expire automatically, or close it manually.
+5. Let the room expire automatically, or close it manually from the creator dashboard. Only the room creator can close a room.
 
 ---
 
@@ -74,9 +74,15 @@ The current interface uses a dark, high-contrast visual language with warm amber
 - 📦 **True Streaming I/O**: Multi-gigabyte transfers stream directly to disk without exhausting server RAM.
 - 🎨 **Responsive HAMAL UI**: Dark-first interface with warm amber accents, plus a preserved light theme for users who prefer it.
 - 🔍 **Interactive QR Lightbox**: One-click smooth zoom for scanning QR codes from across the room.
-- 🛡️ **Self-Hosted & Private**: Zero cloud dependencies, zero external analytics, zero tracking.
+- 🛡️ **Self-Hosted & Private**: Zero cloud dependencies, zero external analytics, zero tracking. All assets, including fonts, are served by your own instance; pages make no third-party requests.
 
-Text messages are temporary and scoped to their room. They are removed with the room lifecycle; the text channel is a technical clipboard rather than a permanent chat application. Each message is limited to 64 KB, with up to 200 messages per room.
+Text messages are temporary and scoped to their room. They are removed with the room lifecycle; the text channel is a technical clipboard rather than a permanent chat application. Each message is limited to 64 KB (`LAN_DROP_MAX_TEXT_SIZE`), with up to 200 messages per room (`LAN_DROP_MAX_TEXTS_PER_ROOM`). System messages (labelled **SERVER**) share that capacity but never block user text: when a room is full, the oldest system messages are removed first. Text is stored exactly as sent, including leading indentation.
+
+### Security model
+
+- Rooms are protected by unguessable links. The creator link controls the room; the participant link (the QR code) can upload, download and exchange text, but cannot close the room.
+- The optional PIN is 4–8 digits. Until a participant has entered it, files, text and the list of connected devices are not disclosed.
+- HAMAL does **not** encrypt files or text at rest, and it serves plain HTTP. On an untrusted network, put it behind an HTTPS reverse proxy. Files live under `/data` until their room expires or is closed.
 
 ---
 
@@ -118,7 +124,7 @@ Text messages are temporary and scoped to their room. They are removed with the 
 
 ### Manual Binary Build (Go)
 
-Prerequisites: Go 1.22+, GCC / CGO (for SQLite support).
+Prerequisites: Go 1.23+, GCC / CGO (for SQLite support).
 
 ```bash
 # Clone the repository
@@ -151,11 +157,13 @@ HAMAL is configured via environment variables:
 | `LAN_DROP_MAX_FILE_SIZE` | `10737418240` (10 GB) | Maximum size of an individual file |
 | `LAN_DROP_MAX_ROOM_SIZE` | `10737418240` (10 GB) | Maximum aggregate file storage per room |
 | `LAN_DROP_MAX_FILES_PER_ROOM`| `100` | Maximum number of files per room |
+| `LAN_DROP_MAX_TEXT_SIZE` | `65536` (64 KB) | Maximum size of a single text message; the web UI uses the same limit |
+| `LAN_DROP_MAX_TEXTS_PER_ROOM` | `200` | Maximum number of text messages kept per room |
 | `LAN_DROP_CLEANUP_INTERVAL` | `1m` | Frequency of background room and orphan file sweeps |
 | `LAN_DROP_LOG_FORMAT` | `json` | Log format (`json` or `text`) |
 | `LAN_DROP_LOG_LEVEL` | `info` | Log verbosity (`debug`, `info`, `warn`, `error`) |
 | `LAN_DROP_SECURE_COOKIES` | `auto` | Cookie security (`auto`, `true`, `false`) |
-| `LAN_DROP_TRUSTED_PROXIES` | *(empty)* | Comma-separated trusted proxy IPs/CIDRs. When using an HTTPS-terminating reverse proxy, configure this or set `LAN_DROP_SECURE_COOKIES=true` so session cookies receive the `Secure` attribute. |
+| `LAN_DROP_TRUSTED_PROXIES` | *(empty)* | Comma-separated trusted proxy IP addresses or CIDR ranges (for example `192.168.1.5,10.0.0.0/8`). When using an HTTPS-terminating reverse proxy, configure this or set `LAN_DROP_SECURE_COOKIES=true` so session cookies receive the `Secure` attribute. |
 
 ---
 
@@ -190,3 +198,7 @@ internal operations, including commercial business operations.
 
 Commercial redistribution, resale, productization, and offering HAMAL or
 derivative works as a commercial service require separate permission from the copyright holder.
+
+The bundled UI fonts (Inter, JetBrains Mono and Caveat) are third-party works licensed under the
+SIL Open Font License 1.1; their license texts are in
+[`internal/app/static/fonts/`](internal/app/static/fonts/).

@@ -48,7 +48,7 @@ jobs:
             org.opencontainers.image.description=Point-to-point local file transfer. The carrier for your digital cargo.
             org.opencontainers.image.source=https://github.com/i1k3r/HAMAL
             org.opencontainers.image.vendor=i1k3r
-            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.licenses=LicenseRef-HAMAL-Source-Available
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
