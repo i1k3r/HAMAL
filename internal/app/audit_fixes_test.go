@@ -457,3 +457,26 @@ func TestConfiguredLimitsReachUIAndBareIPProxyIsTrusted(t *testing.T) {
 		}
 	}
 }
+
+// Bundled font files are cacheable long-term; no other static asset changes its caching.
+func TestFontFilesHaveLongLivedCacheHeaders(t *testing.T) {
+	a := testApp(t)
+
+	font := auditDo(a, http.MethodGet, "/static/fonts/inter-latin-wght-normal.woff2", "", "")
+	if font.Code != http.StatusOK {
+		t.Fatalf("font not served: %d", font.Code)
+	}
+	if cc := font.Header().Get("Cache-Control"); !strings.Contains(cc, "max-age=31536000") || !strings.Contains(cc, "immutable") {
+		t.Fatalf("font file must be cacheable long-term, got Cache-Control %q", cc)
+	}
+
+	for _, path := range []string{"/static/fonts/fonts.css", "/static/site.css", "/static/site.js", "/static/fonts/missing.woff2"} {
+		resp := auditDo(a, http.MethodGet, path, "", "")
+		if cc := resp.Header().Get("Cache-Control"); cc != "" {
+			t.Errorf("%s must keep default caching, got Cache-Control %q", path, cc)
+		}
+	}
+	if missing := auditDo(a, http.MethodGet, "/static/fonts/missing.woff2", "", ""); missing.Code != http.StatusNotFound {
+		t.Errorf("missing font should be 404, got %d", missing.Code)
+	}
+}

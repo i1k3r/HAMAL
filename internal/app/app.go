@@ -507,7 +507,18 @@ func (a *App) routes() (http.Handler, error) {
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(static))))
+	staticFiles := http.StripPrefix("/static/", http.FileServer(http.FS(static)))
+	mux.Handle("GET /static/", staticFiles)
+	// Bundled font files are fixed for a given build, so browsers may keep them long-term.
+	// Scoped to existing .woff2 files only; other static assets keep their default caching.
+	mux.HandleFunc("GET /static/fonts/", func(w http.ResponseWriter, r *http.Request) {
+		if name := strings.TrimPrefix(r.URL.Path, "/static/"); strings.HasSuffix(name, ".woff2") {
+			if info, err := fs.Stat(static, name); err == nil && !info.IsDir() {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			}
+		}
+		staticFiles.ServeHTTP(w, r)
+	})
 	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/x-icon")
 		w.Header().Set("Cache-Control", "public, max-age=86400")

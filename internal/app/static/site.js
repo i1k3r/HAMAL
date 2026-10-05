@@ -2019,9 +2019,10 @@
             confirmCloseBtn.textContent = 'Yes, Close Room';
           }
         } catch (e) {
-          // The request never got a response, so the room may still be open. Do not claim success.
+          // No response arrived, so the outcome is unknown: the server may or may not have
+          // processed the close. Claim neither success nor failure.
           closeAllModals();
-          alert('Could not reach the server. The room has NOT been closed. Check your connection and try again.');
+          alert('Could not confirm that the room was closed. Check your connection and try again.');
           confirmCloseBtn.disabled = false;
           confirmCloseBtn.textContent = 'Yes, Close Room';
         }
