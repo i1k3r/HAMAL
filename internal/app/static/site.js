@@ -1374,6 +1374,20 @@
         }
 
         const isDownloaded = downloadedFiles.has(file.file_id);
+
+        // Preview button for image / video / audio
+        const previewCat = getFileCategory(file.filename);
+        if (['image', 'video', 'audio'].includes(previewCat)) {
+          const previewBtn = document.createElement('button');
+          previewBtn.type = 'button';
+          previewBtn.className = 'btn btn-preview';
+          previewBtn.setAttribute('aria-label', `Preview ${file.filename}`);
+          const eyeIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+          previewBtn.innerHTML = `${eyeIcon} Preview`;
+          previewBtn.addEventListener('click', () => openFilePreview(file.file_id, file.filename, previewCat));
+          actionsDiv.appendChild(previewBtn);
+        }
+
         const downloadLink = document.createElement('a');
         downloadLink.href = `/api/v1/rooms/${encodeURIComponent(token)}/files/${encodeURIComponent(file.file_id)}`;
         downloadLink.download = file.filename;
@@ -1921,6 +1935,101 @@
         }
       });
     }
+
+    // --------------------------------------------------------------------------
+    // File Preview Modal
+    // --------------------------------------------------------------------------
+    const previewOverlay  = document.getElementById('file-preview-overlay');
+    const previewFilename = document.getElementById('preview-filename');
+    const previewBody     = document.getElementById('preview-body');
+    const previewCloseBtn = document.getElementById('preview-close-btn');
+
+    function openFilePreview(fileId, filename, category) {
+      if (!previewOverlay || !previewBody || !previewFilename) return;
+      previewFilename.textContent = filename;
+      previewBody.innerHTML = '';
+
+      const src = `/api/v1/rooms/${encodeURIComponent(token)}/files/${encodeURIComponent(fileId)}`;
+
+      if (category === 'image') {
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = filename;
+        previewBody.appendChild(img);
+      } else if (category === 'video') {
+        const video = document.createElement('video');
+        video.src = src;
+        video.controls = true;
+        video.autoplay = false;
+        previewBody.appendChild(video);
+      } else if (category === 'audio') {
+        const audio = document.createElement('audio');
+        audio.src = src;
+        audio.controls = true;
+        previewBody.appendChild(audio);
+      }
+
+      previewOverlay.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeFilePreview() {
+      if (!previewOverlay) return;
+      previewOverlay.classList.add('hidden');
+      document.body.style.overflow = '';
+      // Stop media playback
+      if (previewBody) {
+        const media = previewBody.querySelector('video, audio');
+        if (media) { media.pause(); media.src = ''; }
+        previewBody.innerHTML = '';
+      }
+    }
+
+    if (previewCloseBtn) {
+      previewCloseBtn.addEventListener('click', closeFilePreview);
+    }
+    if (previewOverlay) {
+      previewOverlay.addEventListener('click', (e) => {
+        if (e.target === previewOverlay) closeFilePreview();
+      });
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && previewOverlay && !previewOverlay.classList.contains('hidden')) {
+        closeFilePreview();
+      }
+    });
+
+    // --------------------------------------------------------------------------
+    // Clipboard Paste — image upload (Ctrl+V anywhere on the page)
+    // --------------------------------------------------------------------------
+    document.addEventListener('paste', (e) => {
+      if (isTerminated) return;
+      // Ignore paste events originating from text inputs / textareas
+      const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+
+      const imageFiles = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          const ext = item.type.split('/')[1] || 'png';
+          const ts  = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          const blob = item.getAsFile();
+          if (blob) {
+            const named = new File([blob], `pasted-image-${ts}.${ext}`, { type: item.type });
+            imageFiles.push(named);
+          }
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        handleFiles(imageFiles);
+      }
+    });
 
     // --------------------------------------------------------------------------
     // Copy Room URL
