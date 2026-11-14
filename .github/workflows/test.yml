@@ -1,0 +1,199 @@
+name: Test
+
+# Regression harness (Phase 0 of the Light Table plan). Test-only: this workflow never builds or
+# publishes images and does not interact with docker-publish.yml.
+#
+# The job runs as separate named steps so the step that fails says what kind of failure it is:
+#   Environment  -> toolchain, browsers or server start-up problem; no tests have run
+#   Contract     -> go vet / go test / known-failure registry
+#   E2E          -> a test failed on every attempt: an application regression
+#   E2E summary  -> lists flaky tests (passed only on retry) and known failures; never fails
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: 'Regenerate visual baselines in the pinned container and upload them as an artifact'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PLAYWRIGHT_VERSION: '1.63.0'
+
+jobs:
+  test:
+    name: Environment, contract and E2E
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Environment
+        run: |
+          set -euo pipefail
+          go build -o "$RUNNER_TEMP/hamal" ./cmd/lan-drop
+          cd e2e
+          npm ci
+          installed="$(npx playwright --version)"
+          echo "$installed"
+          test "$installed" = "Version ${PLAYWRIGHT_VERSION}"
+          npx playwright install --with-deps chromium webkit
+          data="$(mktemp -d)"
+          LAN_DROP_DATA_DIR="$data" LAN_DROP_LISTEN_ADDR=127.0.0.1:7799 LAN_DROP_BASE_URL=http://127.0.0.1:7799 \
+            "$RUNNER_TEMP/hamal" > "$RUNNER_TEMP/env-check.log" 2>&1 &
+          pid=$!
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:7799/readyz > /dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          kill "$pid" || true
+          wait "$pid" 2>/dev/null || true
+          if [ "${ready:-0}" != 1 ]; then
+            echo "::error::Environment: the server did not become ready within 30 s"
+            cat "$RUNNER_TEMP/env-check.log"
+            exit 1
+          fi
+
+      - name: Contract
+        run: |
+          set -euo pipefail
+          go vet ./...
+          go test -count=1 ./...
+          node e2e/check-known-failures.mjs
+
+      - name: E2E
+        working-directory: e2e
+        env:
+          CI: 'true'
+        run: npx playwright test
+
+      - name: E2E summary
+        if: always()
+        working-directory: e2e
+        run: node report-flakes.mjs
+
+      - name: Flake check for new or changed specs
+        if: github.event_name == 'pull_request'
+        working-directory: e2e
+        env:
+          CI: 'true'
+        run: |
+          set -euo pipefail
+          changed="$(git -C .. diff --name-only --diff-filter=AM "origin/${{ github.base_ref }}...HEAD" -- e2e/tests | grep '\.spec\.ts$' | grep -v '/visual/' | sed 's#^e2e/##' || true)"
+          if [ -z "$changed" ]; then echo "No spec changes."; exit 0; fi
+          echo "$changed"
+          # shellcheck disable=SC2086
+          npx playwright test $changed --repeat-each=5 --retries=0 --reporter=list
+
+      - name: Quarantined tests (non-blocking)
+        if: always()
+        continue-on-error: true
+        working-directory: e2e
+        env:
+          CI: 'true'
+          HAMAL_ONLY_QUARANTINED: '1'
+        run: |
+          if [ "$(node -p "require('./quarantine.json').length")" = "0" ]; then echo "Quarantine is empty."; exit 0; fi
+          npx playwright test --reporter=list
+
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 14
+
+  visual:
+    name: Visual baselines (pinned container)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Screenshots are generated and compared only inside the official Playwright image at the
+    # pinned version. Comparison runs once baselines are committed; until then the job only
+    # reports that none exist. Baselines are created on demand (workflow_dispatch with
+    # update_snapshots) and committed in a PR labelled baseline-update.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    env:
+      HAMAL_VISUAL: '1'
+      CI: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check for baselines
+        id: baselines
+        run: |
+          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.update_snapshots }}" = "true" ]; then
+            echo "mode=update" >> "$GITHUB_OUTPUT"
+          elif ls e2e/tests/visual/__screenshots__/*/*/*.png > /dev/null 2>&1; then
+            echo "mode=compare" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+            echo "::notice::No visual baselines are committed yet; run this workflow manually with update_snapshots to create them."
+          fi
+
+      - name: Install harness
+        if: steps.baselines.outputs.mode != 'none'
+        working-directory: e2e
+        run: |
+          npm ci
+          test "$(npx playwright --version)" = "Version ${PLAYWRIGHT_VERSION}"
+
+      - name: Visual
+        if: steps.baselines.outputs.mode != 'none'
+        working-directory: e2e
+        run: |
+          if [ "${{ steps.baselines.outputs.mode }}" = "update" ]; then
+            npx playwright test --project=visual-desktop --project=visual-phone --update-snapshots --retries=0
+          else
+            npx playwright test --project=visual-desktop --project=visual-phone --retries=0
+          fi
+
+      - name: Upload baselines
+        if: steps.baselines.outputs.mode == 'update'
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines
+          path: e2e/tests/visual/__screenshots__
+
+      - name: Upload visual diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diffs
+          path: e2e/test-results
+          retention-days: 14

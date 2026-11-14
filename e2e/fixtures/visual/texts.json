@@ -1,0 +1,30 @@
+{
+  "max_text_size": 65536,
+  "texts": [
+    {
+      "id": "t_fixture_1",
+      "room_id": "fixture-room",
+      "sender_type": "server",
+      "content": "Room created. Share the QR code or link to invite devices.",
+      "size_bytes": 58,
+      "created_at": "2026-11-14T18:30:00Z"
+    },
+    {
+      "id": "t_fixture_3",
+      "room_id": "fixture-room",
+      "sender_type": "client",
+      "content": "https://github.com/i1k3r/HAMAL/releases",
+      "size_bytes": 38,
+      "created_at": "2026-11-14T18:39:00Z"
+    },
+    {
+      "id": "t_fixture_2",
+      "room_id": "fixture-room",
+      "sender_type": "client",
+      "content": "services:\n  hamal:\n    image: ghcr.io/i1k3r/hamal\n    ports: [\"7700:7700\"]",
+      "size_bytes": 72,
+      "created_at": "2026-11-14T18:42:00Z",
+      "is_self": true
+    }
+  ]
+}
