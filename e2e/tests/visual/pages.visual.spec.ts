@@ -42,6 +42,17 @@ async function settle(page: Page) {
   await page.waitForResponse((r) => /\/texts$/.test(new URL(r.url()).pathname), { timeout: 15_000 });
   await page.waitForTimeout(300);
   await page.evaluate(() => document.fonts.ready);
+  // Give countdown a deterministic, fixed-size bounding box independent of timer state
+  await page.evaluate(() => {
+    const el = document.getElementById('countdown');
+    if (el) {
+      el.style.display = 'inline-block';
+      el.style.boxSizing = 'border-box';
+      el.style.width = '6ch';
+      el.style.textAlign = 'center';
+      el.style.overflow = 'hidden';
+    }
+  });
 }
 
 const masks = (page: Page) => [
