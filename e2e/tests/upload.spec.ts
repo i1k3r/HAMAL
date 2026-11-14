@@ -1,7 +1,7 @@
 import { test, expect } from './support/fixtures';
-import { createRoom, getJSON } from './support/api';
+import { createRoom, getJSON, DIAG_URL } from './support/api';
 import { dropFiles, pasteImage } from './support/page';
-import { TransferDiagnostics } from './support/transfer-diagnostics';
+import { TransferDiagnostics, serverUploads } from './support/transfer-diagnostics';
 
 async function serverFiles(room: { base: string; participant_token: string }): Promise<string[]> {
   const r = await getJSON(`${room.base}/api/v1/rooms/${room.participant_token}/files`);
@@ -11,10 +11,12 @@ async function serverFiles(room: { base: string; participant_token: string }): P
 test.describe('upload', () => {
   test('several files can be chosen with the picker @responsive', async ({ page }, testInfo) => {
     // Diagnostics for an intermittent WebKit failure (CI runs 43640379399, 43641965031,
-    // 43641969624: one of the three uploads gets HTTP 400); printed only on failure.
+    // 43641969624, 43643272986, 43643277150: one of the three uploads gets HTTP 400 "uploaded
+    // file is empty"); printed only on failure. The room lives on the diagnostic server, which
+    // runs the same handler and records what it receives for each upload.
     const diag = new TransferDiagnostics();
-    await diag.watch(page, 'page', { 'file rows': '#file-list .file-row' });
-    const room = await createRoom();
+    await diag.watch(page, 'page', { 'file rows': '#file-list .file-row' }, { probeFiles: true });
+    const room = await createRoom({ base: DIAG_URL });
     let failed = true;
     try {
       await page.goto(`${room.base}/r/${room.participant_token}`);
@@ -27,7 +29,11 @@ test.describe('upload', () => {
       expect(await serverFiles(room)).toEqual(['alpha.txt', 'beta.txt', 'gamma.txt']);
       failed = false;
     } finally {
-      await diag.report(testInfo, failed, async () => `files on server: [${(await serverFiles(room)).join(', ')}]`);
+      await diag.report(
+        testInfo,
+        failed,
+        async () => `files on server: [${(await serverFiles(room)).join(', ')}]\n${serverUploads(room.participant_token)}`,
+      );
     }
   });
 

@@ -5,6 +5,8 @@
 
 export const PRIMARY_URL = 'http://127.0.0.1:7799';
 export const LIMITED_URL = 'http://127.0.0.1:7800';
+/** Diagnostic server (e2e/diagserver): same handler, plus a test-only upload observer. */
+export const DIAG_URL = 'http://127.0.0.1:7801';
 
 export type Room = {
   base: string;

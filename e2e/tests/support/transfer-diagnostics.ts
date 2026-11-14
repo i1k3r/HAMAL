@@ -1,4 +1,5 @@
 import type { Page, Request, Response, TestInfo } from '@playwright/test';
+import fs from 'node:fs';
 
 /*
  * Test-only failure diagnostics for intermittent WebKit transfer failures.
@@ -13,7 +14,11 @@ import type { Page, Request, Response, TestInfo } from '@playwright/test';
  *   - every GET …/files and GET …/texts response: time, status and the returned item count/names;
  *   - document.hidden / visibilityState at load and on every visibilitychange;
  *   - optional sampled DOM counts (for example the rendered file rows);
- *   - on failure, the server-side state supplied by the test.
+ *   - optionally (probeFiles), the browser's own File objects: name, size, type, lastModified,
+ *     and the byte length and FNV-1a hash of File.arrayBuffer(), both from input.files when the
+ *     input changes and from every FormData handed to XMLHttpRequest.send;
+ *   - on failure, the server-side state supplied by the test, and (serverUploads) what the
+ *     diagnostic server (e2e/diagserver) received for each upload of the room.
  * Nothing is printed when the test passes. On failure, report() prints one timeline per watched
  * page and attaches it to the test as `transfer-diagnostics.txt`.
  */
@@ -41,7 +46,12 @@ export class TransferDiagnostics {
    * Starts recording for `page`. Call before page.goto(). `count` maps a name to a selector whose
    * match count is sampled every 250 ms (only changes are logged).
    */
-  async watch(page: Page, label: string, count: Record<string, string> = {}): Promise<void> {
+  async watch(
+    page: Page,
+    label: string,
+    count: Record<string, string> = {},
+    opts: { probeFiles?: boolean } = {},
+  ): Promise<void> {
     const w: Watched = {
       label,
       page,
@@ -63,6 +73,8 @@ export class TransferDiagnostics {
         });
       });
     });
+
+    if (opts.probeFiles) await page.addInitScript(fileProbe);
 
     page.on('request', (req) => {
       const kind = this.writeKind(req);
@@ -138,6 +150,22 @@ export class TransferDiagnostics {
         this.log(w.label, 'visibility', `at report hidden=${now.hidden} state=${now.state}`);
       } catch (err) {
         this.log(w.label, 'visibility', `unavailable (${err instanceof Error ? err.message : String(err)})`);
+      }
+    }
+    for (const w of this.watched) {
+      try {
+        const files: FileProbe[] = await w.page.evaluate(() => (window as any).__hamalFiles ?? []);
+        for (const f of files) {
+          const content = f.readError ? `read-error=${f.readError}` : `arrayBuffer-bytes=${f.bytes} fnv1a32=${f.fnv}`;
+          this.log(
+            w.label,
+            `file@${f.stage}`,
+            `${f.name} size=${f.size} type=${JSON.stringify(f.type)} lastModified=${f.lastModified} ${content}`,
+            f.at,
+          );
+        }
+      } catch {
+        /* probe not installed or page closed */
       }
     }
     if (server) {
@@ -218,4 +246,92 @@ export class TransferDiagnostics {
       return `(unreadable: ${err instanceof Error ? err.message : String(err)})`;
     }
   }
+}
+
+type FileProbe = {
+  stage: string;
+  at: number;
+  name: string;
+  size: number;
+  type: string;
+  lastModified: number;
+  bytes?: number;
+  fnv?: string;
+  readError?: string;
+};
+
+/**
+ * Runs in the page. Records File objects as the page sees them; it only reads them, it does not
+ * change what the page sends. The capture-phase listener on document runs before site.js's own
+ * change handler, which clears the input.
+ */
+function fileProbe(): void {
+  const w = window as any;
+  w.__hamalFiles = [];
+  const fnv = (u8: Uint8Array) => {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < u8.length; i++) {
+      h ^= u8[i];
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16).padStart(8, '0');
+  };
+  const record = (f: File, stage: string) => {
+    const entry: any = { stage, at: Date.now(), name: f.name, size: f.size, type: f.type, lastModified: f.lastModified };
+    w.__hamalFiles.push(entry);
+    f.arrayBuffer().then(
+      (buf) => {
+        const u8 = new Uint8Array(buf);
+        entry.bytes = u8.length;
+        entry.fnv = fnv(u8);
+      },
+      (err) => {
+        entry.readError = String(err);
+      },
+    );
+  };
+  document.addEventListener(
+    'change',
+    (e) => {
+      const t = e.target as HTMLInputElement | null;
+      if (t && t.type === 'file' && t.files) for (const f of Array.from(t.files)) record(f, 'input.files');
+    },
+    true,
+  );
+  const send = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = function (this: XMLHttpRequest, body?: any) {
+    if (body instanceof FormData) {
+      for (const [, v] of body.entries()) if (v instanceof File) record(v, 'xhr.send');
+    }
+    return send.call(this, body);
+  };
+}
+
+/** Reads what e2e/diagserver recorded for uploads to the room with `token`, one line per upload. */
+export function serverUploads(token: string): string {
+  const logPath = process.env.HAMAL_DIAG_UPLOAD_LOG;
+  if (!logPath || !fs.existsSync(logPath)) return 'no diagnostic server log';
+  const lines = fs
+    .readFileSync(logPath, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => JSON.parse(l))
+    .filter((r) => r.token === token);
+  if (!lines.length) return 'diagnostic server recorded no uploads for this room';
+  return lines
+    .map((r) => {
+      const parts = (r.parts ?? [])
+        .map(
+          (p: any) =>
+            `part{name=${p.form_name} filename=${JSON.stringify(p.file_name)} bytes=${p.bytes} fnv1a32=${p.fnv1a32} headers=${JSON.stringify(p.headers)}${p.read_error ? ` read-error=${p.read_error}` : ''}}`,
+        )
+        .join(' ');
+      return (
+        `received ${r.query_filename}: status=${r.response_status} response=${r.response_body} ` +
+        `content-type=${JSON.stringify(r.content_type)} content-length=${r.content_length} ` +
+        `transfer-encoding=${JSON.stringify(r.transfer_encoding ?? [])} body-bytes-read-by-handler=${r.body_bytes_read_by_handler}` +
+        `${r.copy_truncated ? ' (copy truncated)' : ''} ${parts}${r.parse_error ? ` parse-error=${r.parse_error}` : ''}`
+      );
+    })
+    .join('\n');
 }

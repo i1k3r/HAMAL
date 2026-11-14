@@ -13,7 +13,7 @@ import path from 'node:path';
  * `test.use({ allowedConsoleErrors: [/pattern/] })`.
  */
 
-const ALLOWED_ORIGINS = new Set(['http://127.0.0.1:7799', 'http://127.0.0.1:7800']);
+const ALLOWED_ORIGINS = new Set(['http://127.0.0.1:7799', 'http://127.0.0.1:7800', 'http://127.0.0.1:7801']);
 // Chromium logs every failed resource load (HTTP error status or net:: error) as a console error.
 const NETWORK_LOG = /^Failed to load resource: /;
 
