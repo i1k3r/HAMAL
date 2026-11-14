@@ -1,6 +1,7 @@
 import { test, expect } from './support/fixtures';
 import { createRoom, getJSON } from './support/api';
 import { dropFiles, pasteImage } from './support/page';
+import { UploadDiagnostics } from './support/upload-diagnostics';
 
 async function serverFiles(room: { base: string; participant_token: string }): Promise<string[]> {
   const r = await getJSON(`${room.base}/api/v1/rooms/${room.participant_token}/files`);
@@ -8,16 +9,25 @@ async function serverFiles(room: { base: string; participant_token: string }): P
 }
 
 test.describe('upload', () => {
-  test('several files can be chosen with the picker @responsive', async ({ page }) => {
+  test('several files can be chosen with the picker @responsive', async ({ page }, testInfo) => {
+    // Diagnostics for an intermittent WebKit failure (CI run 43640379399); printed only on failure.
+    const diag = new UploadDiagnostics(page);
+    await diag.attach();
     const room = await createRoom();
-    await page.goto(`${room.base}/r/${room.participant_token}`);
-    await page.locator('#file-input').setInputFiles([
-      { name: 'alpha.txt', mimeType: 'text/plain', buffer: Buffer.from('alpha') },
-      { name: 'beta.txt', mimeType: 'text/plain', buffer: Buffer.from('beta') },
-      { name: 'gamma.txt', mimeType: 'text/plain', buffer: Buffer.from('gamma') },
-    ]);
-    await expect(page.locator('#file-list .file-row')).toHaveCount(3, { timeout: 12_000 });
-    expect(await serverFiles(room)).toEqual(['alpha.txt', 'beta.txt', 'gamma.txt']);
+    let failed = true;
+    try {
+      await page.goto(`${room.base}/r/${room.participant_token}`);
+      await page.locator('#file-input').setInputFiles([
+        { name: 'alpha.txt', mimeType: 'text/plain', buffer: Buffer.from('alpha') },
+        { name: 'beta.txt', mimeType: 'text/plain', buffer: Buffer.from('beta') },
+        { name: 'gamma.txt', mimeType: 'text/plain', buffer: Buffer.from('gamma') },
+      ]);
+      await expect(page.locator('#file-list .file-row')).toHaveCount(3, { timeout: 12_000 });
+      expect(await serverFiles(room)).toEqual(['alpha.txt', 'beta.txt', 'gamma.txt']);
+      failed = false;
+    } finally {
+      await diag.report(testInfo, failed, () => serverFiles(room));
+    }
   });
 
   test('files dropped on the upload area are uploaded', async ({ page }) => {
