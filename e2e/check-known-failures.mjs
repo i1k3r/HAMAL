@@ -47,7 +47,8 @@ const used = new Map();
 for (const file of walk(path.join(root, 'tests'))) {
   const src = fs.readFileSync(file, 'utf8');
   for (const m of src.matchAll(/knownFailure\(\s*['"`](KF-\d+)['"`]/g)) {
-    used.set(m[1], path.relative(root, file));
+    // known-failures.json uses forward slashes; path.relative() uses backslashes on Windows.
+    used.set(m[1], path.relative(root, file).replace(/\\/g, '/'));
   }
 }
 for (const id of ids) if (!used.has(id)) problems.push(`${id}: registered but not used by any spec`);

@@ -11,8 +11,9 @@ name: Test
 
 on:
   pull_request:
-  push:
     branches: [main]
+  push:
+    branches: [main, feature/phase-0-regression-harness]
   workflow_dispatch:
     inputs:
       update_snapshots:
