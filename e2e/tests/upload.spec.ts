@@ -1,7 +1,7 @@
 import { test, expect } from './support/fixtures';
 import { createRoom, getJSON } from './support/api';
 import { dropFiles, pasteImage } from './support/page';
-import { UploadDiagnostics } from './support/upload-diagnostics';
+import { TransferDiagnostics } from './support/transfer-diagnostics';
 
 async function serverFiles(room: { base: string; participant_token: string }): Promise<string[]> {
   const r = await getJSON(`${room.base}/api/v1/rooms/${room.participant_token}/files`);
@@ -10,9 +10,10 @@ async function serverFiles(room: { base: string; participant_token: string }): P
 
 test.describe('upload', () => {
   test('several files can be chosen with the picker @responsive', async ({ page }, testInfo) => {
-    // Diagnostics for an intermittent WebKit failure (CI run 43640379399); printed only on failure.
-    const diag = new UploadDiagnostics(page);
-    await diag.attach();
+    // Diagnostics for an intermittent WebKit failure (CI runs 43640379399, 43641965031,
+    // 43641969624: one of the three uploads gets HTTP 400); printed only on failure.
+    const diag = new TransferDiagnostics();
+    await diag.watch(page, 'page', { 'file rows': '#file-list .file-row' });
     const room = await createRoom();
     let failed = true;
     try {
@@ -26,7 +27,7 @@ test.describe('upload', () => {
       expect(await serverFiles(room)).toEqual(['alpha.txt', 'beta.txt', 'gamma.txt']);
       failed = false;
     } finally {
-      await diag.report(testInfo, failed, () => serverFiles(room));
+      await diag.report(testInfo, failed, async () => `files on server: [${(await serverFiles(room)).join(', ')}]`);
     }
   });
 
