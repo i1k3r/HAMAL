@@ -10,10 +10,6 @@ import path from 'node:path';
  *   - primary (127.0.0.1:7799): the configuration from the handoff, default product limits.
  *   - limited (127.0.0.1:7800): global sharing enabled and small quotas, used only by
  *     share.spec.ts and quota.spec.ts so the primary server keeps default behaviour.
- *   - diag (127.0.0.1:7801): the unchanged application handler started by the test-only
- *     e2e/diagserver, which records what the server receives for each upload. Used only by the
- *     multi-file picker test while the intermittent WebKit "uploaded file is empty" failure is
- *     being diagnosed.
  * Each server gets a fresh temporary data directory per run.
  */
 
@@ -29,16 +25,6 @@ function dataDir(envKey: string, prefix: string): string {
 
 export const PRIMARY_URL = 'http://127.0.0.1:7799';
 export const LIMITED_URL = 'http://127.0.0.1:7800';
-export const DIAG_URL = 'http://127.0.0.1:7801';
-
-// Upload observer log written by the diagnostic server (e2e/diagserver); read by
-// tests/support/transfer-diagnostics.ts. One path per run, shared with the workers.
-if (!process.env.HAMAL_DIAG_UPLOAD_LOG) {
-  process.env.HAMAL_DIAG_UPLOAD_LOG = path.join(
-    fs.mkdtempSync(path.join(os.tmpdir(), 'hamal-e2e-diag-')),
-    'uploads.jsonl',
-  );
-}
 
 const commonEnv = {
   LAN_DROP_MIN_TTL: '60s',
@@ -167,22 +153,6 @@ export default defineConfig({
         LAN_DROP_MAX_FILE_SIZE: '1048576',
         LAN_DROP_MAX_ROOM_SIZE: '3145728',
         LAN_DROP_MAX_FILES_PER_ROOM: '5',
-      },
-    },
-    {
-      command: 'go run ./e2e/diagserver',
-      cwd: repoRoot,
-      url: `${DIAG_URL}/readyz`,
-      timeout: 180_000,
-      reuseExistingServer: !process.env.CI,
-      stdout: 'ignore',
-      stderr: 'pipe',
-      env: {
-        ...commonEnv,
-        LAN_DROP_DATA_DIR: dataDir('HAMAL_E2E_DIAG_DIR', 'hamal-e2e-diag-data-'),
-        LAN_DROP_LISTEN_ADDR: '127.0.0.1:7801',
-        LAN_DROP_BASE_URL: DIAG_URL,
-        HAMAL_DIAG_UPLOAD_LOG: process.env.HAMAL_DIAG_UPLOAD_LOG as string,
       },
     },
   ],

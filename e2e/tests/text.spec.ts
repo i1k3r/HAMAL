@@ -1,47 +1,31 @@
 import { test, expect, knownFailure } from './support/fixtures';
 import { createRoom, mustPostText, postText, getJSON } from './support/api';
-import { TransferDiagnostics } from './support/transfer-diagnostics';
 
 test.describe('text notes', () => {
-  test('a note sent from one device appears on the other, newest first @responsive', async ({ browser }, testInfo) => {
+  test('a note sent from one device appears on the other, newest first @responsive', async ({ browser }) => {
     const room = await createRoom();
     const creatorCtx = await browser.newContext();
     const creator = await creatorCtx.newPage();
+    await creator.goto(`${room.base}/c/${room.creator_token}`);
+    await creator.locator('#tab-text').click();
+
     const phone = await browser.newPage();
-    // Diagnostics for an intermittent WebKit failure (CI run 43641965031: the first note was not
-    // accepted, so the input was not cleared); printed only on failure.
-    const diag = new TransferDiagnostics();
-    await diag.watch(creator, 'creator', { 'text cards': '#text-list .text-item-card' });
-    await diag.watch(phone, 'phone', { 'text cards': '#text-list .text-item-card' });
-    let failed = true;
-    try {
-      await creator.goto(`${room.base}/c/${room.creator_token}`);
-      await creator.locator('#tab-text').click();
+    await phone.goto(`${room.base}/r/${room.participant_token}`);
+    await phone.locator('#tab-text').click();
+    await phone.locator('#text-input').fill('first from phone');
+    await phone.locator('#send-text-btn').click();
+    await expect(phone.locator('#text-input')).toHaveValue('');
+    await phone.locator('#text-input').fill('second from phone');
+    await phone.locator('#send-text-btn').click();
 
-      await phone.goto(`${room.base}/r/${room.participant_token}`);
-      await phone.locator('#tab-text').click();
-      await phone.locator('#text-input').fill('first from phone');
-      await phone.locator('#send-text-btn').click();
-      await expect(phone.locator('#text-input')).toHaveValue('');
-      await phone.locator('#text-input').fill('second from phone');
-      await phone.locator('#send-text-btn').click();
-
-      const cards = creator.locator('#text-list .text-item-card');
-      await expect(cards.first()).toContainText('second from phone', { timeout: 12_000 });
-      await expect(cards.nth(1)).toContainText('first from phone');
-      // Sender's own notes are marked as self; the other device sees them as a peer's.
-      await expect(phone.locator('#text-list .text-item-card').first()).toHaveClass(/client-self/);
-      await expect(cards.first()).toHaveClass(/client-peer/);
-      failed = false;
-    } finally {
-      await diag.report(testInfo, failed, async () => {
-        const r = await getJSON(`${room.base}/api/v1/rooms/${room.participant_token}/texts`);
-        const texts = (r.json.texts ?? []).map((t: any) => `${t.sender_type}:${JSON.stringify(String(t.content).slice(0, 40))}`);
-        return `texts on server: [${texts.join(', ')}]`;
-      });
-      await creatorCtx.close();
-      await phone.close();
-    }
+    const cards = creator.locator('#text-list .text-item-card');
+    await expect(cards.first()).toContainText('second from phone', { timeout: 12_000 });
+    await expect(cards.nth(1)).toContainText('first from phone');
+    // Sender's own notes are marked as self; the other device sees them as a peer's.
+    await expect(phone.locator('#text-list .text-item-card').first()).toHaveClass(/client-self/);
+    await expect(cards.first()).toHaveClass(/client-peer/);
+    await creatorCtx.close();
+    await phone.close();
   });
 
   test('the size counter tracks bytes and blocks text over the limit', async ({ page }) => {

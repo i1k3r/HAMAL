@@ -87,6 +87,21 @@ update them, run the **Test** workflow manually with `update_snapshots` enabled,
 `visual-baselines` artifact into `tests/visual/__screenshots__/`, and commit it in a PR labelled
 `baseline-update`. Until baselines are committed, the CI visual job reports that none exist.
 
+## WebKit upload investigation
+
+The multi-file picker test (`upload.spec.ts`, "several files can be chosen with the picker")
+originally passed Playwright in-memory buffers to `setInputFiles`. In WebKit it intermittently
+failed: one of the three uploads was rejected with HTTP 400 "uploaded file is empty".
+
+- Diagnostics showed that the browser's `File` objects had the correct size and content, but the
+  multipart request WebKit sent was shorter by exactly the file's size and contained an empty file
+  part. The server parsed that request correctly.
+- In a controlled CI experiment, the in-memory control failed 49 of 160 WebKit runs across two
+  experiments; the same test with temporary files on disk failed 0 of 20 WebKit runs. Chromium
+  had no failures in any variant.
+- The problem was isolated to the test's in-memory file input method. The test now writes
+  temporary files to disk and passes their paths; no production HAMAL change was necessary.
+
 ## Files
 
 | Path | Purpose |
