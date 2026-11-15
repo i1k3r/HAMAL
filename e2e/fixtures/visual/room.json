@@ -1,0 +1,28 @@
+{
+  "room_id": "fixture-room",
+  "status": "active",
+  "is_creator": true,
+  "expires_at": "2026-11-14T19:41:00Z",
+  "close_deadline": "",
+  "closing_remaining_seconds": 0,
+  "remaining_seconds": 2460,
+  "pin_required": false,
+  "pin_authenticated": true,
+  "is_locked": false,
+  "retry_after_seconds": 0,
+  "participant_count": 2,
+  "participants": [
+    {
+      "id": "192.168.1.20",
+      "ip": "192.168.1.20",
+      "name": "Windows Device",
+      "last_seen": "2026-11-14T18:40:00Z"
+    },
+    {
+      "id": "192.168.1.31",
+      "ip": "192.168.1.31",
+      "name": "Android Device",
+      "last_seen": "2026-11-14T18:40:02Z"
+    }
+  ]
+}

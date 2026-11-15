@@ -1,0 +1,47 @@
+{
+  "status": "active",
+  "close_deadline": "",
+  "closing_remaining_seconds": 0,
+  "files": [
+    {
+      "file_id": "f_fixture_1",
+      "filename": "Invoice_November_2026.pdf",
+      "size_bytes": 188416,
+      "content_type": "application/pdf",
+      "status": "ready",
+      "created_at": "2026-11-14T18:31:00Z",
+      "completed_at": "2026-11-14T18:31:01Z"
+    },
+    {
+      "file_id": "f_fixture_2",
+      "filename": "voice-memo.m4a",
+      "size_bytes": 1048576,
+      "content_type": "audio/mp4",
+      "status": "ready",
+      "created_at": "2026-11-14T18:33:00Z",
+      "completed_at": "2026-11-14T18:33:02Z"
+    },
+    {
+      "file_id": "f_fixture_3",
+      "filename": "IMG_4821.jpg",
+      "size_bytes": 3355443,
+      "content_type": "image/jpeg",
+      "status": "ready",
+      "created_at": "2026-11-14T18:40:00Z",
+      "completed_at": "2026-11-14T18:40:03Z"
+    },
+    {
+      "file_id": "f_fixture_4",
+      "filename": "setup.exe",
+      "size_bytes": 52428800,
+      "content_type": "application/octet-stream",
+      "status": "ready",
+      "created_at": "2026-11-14T18:41:00Z",
+      "completed_at": "2026-11-14T18:41:09Z"
+    }
+  ],
+  "total_size_bytes": 57021235,
+  "file_count": 4,
+  "max_room_size": 10737418240,
+  "max_files": 100
+}
