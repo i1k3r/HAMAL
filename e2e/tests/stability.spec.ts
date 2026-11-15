@@ -1,10 +1,10 @@
-import { test, expect, knownFailure } from './support/fixtures';
+import { test, expect } from './support/fixtures';
 import { createRoom, mustUpload, mustPostText } from './support/api';
 import { waitForPolls, markScroller, scrollTo, firstVisible } from './support/page';
 
 /*
- * Poll stability. Phase 1 (keyed rendering) must fix the known failures recorded here; the
- * plain tests pin behaviour that already works and must keep working.
+ * Poll stability. The Light Table room pages render items by key, so a poll never rebuilds the
+ * list: focus, scroll position and the newest notes stay put. (Formerly KF-001 to KF-003.)
  */
 
 test.describe('poll stability', () => {
@@ -19,7 +19,7 @@ test.describe('poll stability', () => {
     await expect(link).toBeFocused();
     await waitForPolls(page, 1);
 
-    await knownFailure('KF-001', async () => {
+    {
       const focusedFile = await page.evaluate(() => {
         const a = document.activeElement as HTMLElement | null;
         const row = a ? a.closest('.file-row') as HTMLElement | null : null;
@@ -28,8 +28,8 @@ test.describe('poll stability', () => {
       const expectedFile = await page
         .locator('#file-list .file-row', { hasText: 'report-2.txt' })
         .getAttribute('data-file-id');
-      expect(focusedFile, 'KF-001: focus stays on the same Download link after a poll').toBe(expectedFile);
-    });
+      expect(focusedFile, 'focus stays on the same Download link after a poll').toBe(expectedFile);
+    }
   });
 
   test('visible file rows stay in place when a poll adds a file', async ({ page }) => {
@@ -42,20 +42,20 @@ test.describe('poll stability', () => {
     const scroller = await markScroller(page, '#file-list');
     await scrollTo(page, scroller, 900);
     await page.waitForTimeout(200);
-    const before = await firstVisible(page, '#file-list .file-row', '.file-title');
+    const before = await firstVisible(page, '#file-list .file-row', '.lt-item-name');
     expect(before, 'setup: a file row is visible after scrolling').not.toBeNull();
 
     await mustUpload(room, 'file-new.txt', 'x');
     await expect(page.locator('#file-list .file-row')).toHaveCount(31, { timeout: 12_000 });
     await page.waitForTimeout(200);
 
-    await knownFailure('KF-002', async () => {
-      const after = await firstVisible(page, '#file-list .file-row', '.file-title');
+    {
+      const after = await firstVisible(page, '#file-list .file-row', '.lt-item-name');
       expect(
         after,
-        'KF-002: the row at the top of the viewport stays in place after a poll adds a file',
+        'the row at the top of the viewport stays in place after a poll adds a file',
       ).toEqual(before);
-    });
+    }
   });
 
   test('the text list keeps the newest notes in view across a poll and after sending', async ({ page }) => {
@@ -63,34 +63,35 @@ test.describe('poll stability', () => {
     const room = await createRoom();
     for (let i = 0; i < 30; i++) await mustPostText(room, `note ${String(i).padStart(2, '0')}\nsecond line\nthird line`);
     await page.goto(`${room.base}/r/${room.participant_token}`);
-    await page.locator('#tab-text').click();
-    await expect(page.locator('#text-list .text-item-card')).toHaveCount(31); // 30 + the room's welcome message
+    await expect(page.locator('#file-list .text-item-card')).toHaveCount(30); // the room's own messages go to the room log, not the table
 
-    const scroller = await markScroller(page, '#text-list');
+    const scroller = await markScroller(page, '#file-list');
     await scrollTo(page, scroller, 0);
     await page.waitForTimeout(200);
 
     await mustPostText(room, 'note 30 from another device');
-    await expect(page.locator('#text-list .text-item-card')).toHaveCount(32, { timeout: 12_000 });
+    await expect(page.locator('#file-list .text-item-card')).toHaveCount(31, { timeout: 12_000 });
     await waitForPolls(page, 1);
 
     // Plain assertion: after a poll the newest notes stay in view. (The handoff candidate said the
     // list "scrolls to the oldest note after a poll"; that part does not reproduce on 6765e5e.)
-    const afterPoll = await firstVisible(page, '#text-list .text-item-card', '.text-item-content');
+    const afterPoll = await firstVisible(page, '#file-list .text-item-card', '.text-item-content');
     expect(afterPoll?.label, 'the newest note is at the top of the viewport after a poll').toContain(
       'note 30 from another device',
     );
 
+    await page.locator('#write-note-btn').click();
     await page.locator('#text-input').fill('note 31 from this phone');
     await page.locator('#send-text-btn').click();
-    await expect(page.locator('#text-list .text-item-card').first()).toContainText('note 31 from this phone');
+    await expect(page.locator('#file-list .text-item-card').first()).toContainText('note 31 from this phone');
     await page.waitForTimeout(200);
 
-    await knownFailure('KF-003', async () => {
-      const afterSend = await firstVisible(page, '#text-list .text-item-card', '.text-item-content');
-      expect(afterSend?.label, 'KF-003: the note just sent is visible after sending').toContain(
+    await page.locator('#composer-cancel').click();
+    {
+      const afterSend = await firstVisible(page, '#file-list .text-item-card', '.text-item-content');
+      expect(afterSend?.label, 'the note just sent is visible after sending').toContain(
         'note 31 from this phone',
       );
-    });
+    }
   });
 });

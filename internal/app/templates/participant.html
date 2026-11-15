@@ -2,537 +2,81 @@
 <!doctype html>
 <html lang="en" data-theme="dark" dir="ltr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#080A0B" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#F7F8FA" media="(prefers-color-scheme: light)">
-  <title>HAMAL · Client Connection</title>
-  <link rel="icon" type="image/svg+xml" href="/static/brand/hamal-app-icon.svg">
-  <link rel="alternate icon" href="/favicon.ico">
-  <link rel="apple-touch-icon" href="/static/brand/hamal-app-icon.svg">
-  <link rel="stylesheet" href="/static/fonts/fonts.css">
-  <link rel="stylesheet" href="/static/site.css">
-  <script>
-    (function() {
-      var saved = localStorage.getItem('hamal_theme');
-      var theme = saved || 'dark';
-      document.documentElement.setAttribute('data-theme', theme);
-    })();
-  </script>
-  <script defer src="/static/site.js"></script>
+  {{template "lt-head" .}}
+  <title>HAMAL · Room</title>
 </head>
-<body data-page="participant" data-role="CLIENT" data-token="{{.ParticipantToken}}" data-expires="{{.ExpiresAtRFC3339}}" data-status="{{.Status}}" data-close-deadline="{{.CloseDeadline}}" data-closing-seconds="{{.ClosingRemainingSeconds}}" data-pin-required="{{.PinRequired}}" data-pin-authenticated="{{.PinAuthenticated}}" data-is-locked="{{.IsLocked}}" data-retry-after="{{.RetryAfterSeconds}}" data-max-text-size="{{.MaxTextSize}}">
-  <div class="client-viewport">
-    <!-- Top Application Bar -->
-    <header class="client-top-bar">
-      <div class="client-brand-wrap">
-        <div class="client-brand-text-col">
-          <a href="/" class="client-brand" title="HAMAL">
-            <img src="/static/brand/hamal-logo-light.svg" alt="HAMAL" class="client-logo logo-light" width="104" height="24">
-            <img src="/static/brand/hamal-logo-dark.svg" alt="HAMAL" class="client-logo logo-dark" width="104" height="24">
-          </a>
-          <span class="client-brand-tagline">TRANSFER LOCALLY</span>
-        </div>
-        <div class="client-role-pill font-mono">CLIENT</div>
+<body class="lt" data-page="participant" data-role="CLIENT" data-token="{{.ParticipantToken}}" data-expires="{{.ExpiresAtRFC3339}}" data-status="{{.Status}}" data-close-deadline="{{.CloseDeadline}}" data-closing-seconds="{{.ClosingRemainingSeconds}}" data-pin-required="{{.PinRequired}}" data-pin-authenticated="{{.PinAuthenticated}}" data-is-locked="{{.IsLocked}}" data-retry-after="{{.RetryAfterSeconds}}" data-max-text-size="{{.MaxTextSize}}">
+
+  <!-- PIN screen: nothing about the room is shown until the PIN is accepted -->
+  <section class="lt-gate" id="pin-barrier-card" {{if or (not .PinRequired) .PinAuthenticated .Inactive}}hidden{{end}}>
+    <header class="lt-top"><a class="lt-wordmark" href="/">hamal</a></header>
+    <div class="lt-gate-stage">
+      <div class="lt-gate-card">
+        <h1 id="pin-title">Join this room</h1>
+        <p>The person who opened it set a PIN. Ask them for it.</p>
+        <form id="pin-form" method="POST" action="/api/v1/rooms/{{.ParticipantToken}}/auth/pin" novalidate>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <label for="participant-pin-input">Room PIN</label>
+            <input type="password" id="participant-pin-input" class="lt-pin-input" name="pin" inputmode="numeric" pattern="[0-9]{4,8}" autocomplete="one-time-code" minlength="4" maxlength="8" aria-describedby="pin-help pin-error-text pin-cooldown-text" {{if .IsLocked}}disabled{{end}}>
+            <span id="pin-help" style="font-size:14px;color:var(--ink-muted)">4 to 8 digits.</span>
+            <div class="lt-gate-msg is-error" id="pin-error" role="alert" style="display:none"><span id="pin-error-text"></span></div>
+            <div class="lt-gate-msg is-warn" id="pin-cooldown" role="status" style="{{if not .IsLocked}}display:none;{{end}}"><span id="pin-cooldown-text">{{if .IsLocked}}Too many tries. Try again in {{.RetryAfterSeconds}} s.{{end}}</span></div>
+            <button type="submit" class="lt-btn lt-btn-primary" id="unlock-btn" {{if .IsLocked}}disabled{{end}}><span id="unlock-btn-text">Join</span></button>
+          </div>
+        </form>
       </div>
+    </div>
+  </section>
 
-      <!-- Top Right Status & Window Controls -->
-      <div class="client-top-right">
-        <div class="client-status-pills">
-          <span class="status-dot-amber"></span>
-          <span>Private</span>
-          <span class="status-dot-muted"></span>
-          <span>Local</span>
-          <span class="status-dot-muted"></span>
-          <span>Yours</span>
-        </div>
-
-        <div class="client-window-controls" aria-hidden="true">
-          <span class="win-btn win-min" title="Minimize">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line></svg>
-          </span>
-          <span class="win-btn win-max" title="Maximize">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-          </span>
-          <span class="win-btn win-close" title="Close">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </span>
-        </div>
+  <div class="lt-frame" id="room-active-card" {{if or (and .PinRequired (not .PinAuthenticated)) .Inactive}}hidden{{end}}>
+    <header class="lt-top">
+      <a class="lt-wordmark" href="/" title="HAMAL home">hamal</a>
+      {{template "lt-lamp" .}}
+      <span class="lt-top-note"><span id="participant-count-val">{{.ParticipantCount}}</span> at the table</span>
+      <span class="lt-capacity" id="capacity"></span>
+      <span class="lt-spacer"></span>
+      <div class="lt-top-actions">
+        {{template "lt-theme" .}}
+      </div>
+      <button type="button" class="lt-menu-btn" id="room-menu-btn" aria-label="Room options" aria-expanded="false" aria-controls="room-menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
+      </button>
+      <div class="lt-menu" id="room-menu" hidden>
+        <button type="button" data-menu="theme">Switch frame light or dark</button>
+        <button type="button" data-menu="shortcuts">Keyboard shortcuts</button>
       </div>
     </header>
 
-    <!-- Main Content Area -->
-    <main class="client-main-content">
-      <!-- PIN Authentication Barrier Section (Full Width Screen) -->
-      <section id="pin-barrier-card" class="client-pin-barrier-section" style="{{if or (not .PinRequired) .PinAuthenticated .Inactive}}display: none;{{end}}">
-        <!-- Background Atmospheric Elements -->
-        <div class="pin-bg-decorations" aria-hidden="true">
-          <!-- Left Handwritten Callout -->
-          <div class="pin-handwritten-callout">
-            <span class="handwritten-line">Share</span>
-            <span class="handwritten-line">Without</span>
-            <span class="handwritten-line">Limits.</span>
-            <svg class="handwritten-underline-pin" width="84" height="18" viewBox="0 0 84 18" fill="none">
-              <path d="M2 5C26 2 60 2 82 6" stroke="#FF7800" stroke-width="2.8" stroke-linecap="round"/>
-              <path d="M12 13C34 11 62 10 76 14" stroke="#FF7800" stroke-width="2.2" stroke-linecap="round"/>
-            </svg>
-          </div>
+    <div id="expiry-slot"></div>
+    <div class="lt-banner" id="room-closing-card" role="alert" {{if ne .Status "closing"}}hidden{{end}}>
+      <span>This room is closing in <span id="closing-countdown">{{if .ClosingRemainingSeconds}}{{.ClosingRemainingSeconds}}{{else}}10{{end}}</span> s. Save anything you need now.</span>
+    </div>
 
-          <!-- Right Mountain Silhouette & Tagline -->
-          <div class="pin-mountain-backdrop">
-            <svg class="mountain-vector-pin" viewBox="0 0 860 580" fill="none" preserveAspectRatio="none">
-              <defs>
-                <radialGradient id="pinMountainGlow" cx="72%" cy="28%" r="72%">
-                  <stop offset="0%" stop-color="#FF7800" stop-opacity="0.42" />
-                  <stop offset="40%" stop-color="#FF7800" stop-opacity="0.12" />
-                  <stop offset="100%" stop-color="#FF7800" stop-opacity="0.0" />
-                </radialGradient>
-                <linearGradient id="pinPeakGrad1" x1="20%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stop-color="#1A1510" stop-opacity="0.98" />
-                  <stop offset="100%" stop-color="#080A0B" stop-opacity="0.4" />
-                </linearGradient>
-                <linearGradient id="pinPeakGrad2" x1="30%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stop-color="#231910" stop-opacity="0.95" />
-                  <stop offset="100%" stop-color="#080A0B" stop-opacity="0.2" />
-                </linearGradient>
-                <linearGradient id="pinPeakGrad3" x1="10%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stop-color="#2C1E12" stop-opacity="0.9" />
-                  <stop offset="100%" stop-color="#080A0B" stop-opacity="0.1" />
-                </linearGradient>
-              </defs>
-              <!-- Ambient Warm Sunset Glow -->
-              <rect width="860" height="580" fill="url(#pinMountainGlow)" />
-              <!-- Background Far Peaks -->
-              <path d="M40 580 L 180 380 L 290 280 L 420 150 L 530 220 L 680 90 L 760 170 L 860 120 L 860 580 Z" fill="url(#pinPeakGrad1)" />
-              <path d="M40 580 L 180 380 L 290 280 L 420 150 L 530 220 L 680 90 L 760 170 L 860 120" stroke="#FF7800" stroke-width="1.6" stroke-opacity="0.45" stroke-dasharray="2 3" />
-              <!-- Main Mountain Ridge with Sharp Facets & Rim Glow -->
-              <path d="M100 580 L 220 390 L 350 250 L 480 180 L 580 260 L 710 130 L 790 200 L 860 160 L 860 580 Z" fill="url(#pinPeakGrad2)" />
-              <path d="M100 580 L 220 390 L 350 250 L 480 180 L 580 260 L 710 130 L 790 200 L 860 160" stroke="#FF8A00" stroke-width="2.6" stroke-opacity="0.75" />
-              <!-- Mountain Cliff Shading Facets -->
-              <path d="M480 180 L 520 280 L 580 260 L 650 360 L 710 130 L 750 270 L 790 200 L 840 320 L 860 580 L 480 580 Z" fill="#120E0A" fill-opacity="0.6" />
-              <!-- Fore-ridge Topography -->
-              <path d="M200 580 L 320 420 L 440 300 L 560 250 L 660 310 L 770 210 L 860 250 L 860 580 Z" fill="url(#pinPeakGrad3)" />
-              <path d="M200 580 L 320 420 L 440 300 L 560 250 L 660 310 L 770 210 L 860 250" stroke="#FFA024" stroke-width="1.8" stroke-opacity="0.6" />
-              <!-- Topographical Mesh Lines -->
-              <path d="M220 390 Q 290 310 350 250 Q 420 210 480 180 Q 540 215 580 260 Q 640 190 710 130 Q 750 165 790 200 Q 825 180 860 160" stroke="#FF7800" stroke-width="1.2" stroke-opacity="0.5" stroke-dasharray="1 3" />
-              <path d="M280 440 Q 370 340 450 280 Q 530 255 600 290 Q 680 245 750 230 L 860 270" stroke="#FF7800" stroke-width="1.2" stroke-opacity="0.4" stroke-dasharray="2 4" />
-              <path d="M340 490 Q 430 390 510 330 Q 590 305 660 350 L 860 320" stroke="#FF7800" stroke-width="0.9" stroke-opacity="0.3" stroke-dasharray="2 3" />
-            </svg>
-            <div class="pin-mountain-tagline font-mono">
-              <span>SIMPLE.</span>
-              <span>PRIVATE.</span>
-              <span>YOURS.</span>
-            </div>
-          </div>
+    {{template "lt-toolbar" .}}
 
-          <!-- Lower Wireframe Landscape Waves with Water Reflection -->
-          <div class="pin-wireframe-landscape">
-            <svg class="wireframe-wave-svg" viewBox="0 0 1776 340" fill="none" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="waveReflectGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stop-color="#FF7800" stop-opacity="0.32" />
-                  <stop offset="40%" stop-color="#FF7800" stop-opacity="0.10" />
-                  <stop offset="100%" stop-color="#080A0B" stop-opacity="0.0" />
-                </linearGradient>
-              </defs>
-              <!-- Glowing Wave Sine Lines -->
-              <path d="M0 200 Q 444 40 888 175 T 1776 125" stroke="#FF7800" stroke-width="1.5" stroke-opacity="0.55" stroke-dasharray="2 3" />
-              <path d="M0 225 Q 444 70 888 200 T 1776 150" stroke="#FF8A00" stroke-width="1.8" stroke-opacity="0.45" stroke-dasharray="3 4" />
-              <path d="M0 250 Q 444 100 888 225 T 1776 180" stroke="#FF7800" stroke-width="1.3" stroke-opacity="0.35" stroke-dasharray="1 3" />
-              <path d="M0 270 Q 444 130 888 245 T 1776 210" stroke="#FF7800" stroke-width="1.0" stroke-opacity="0.25" />
-              <!-- Perspective Vertical Flow Grid Lines -->
-              <path d="M120 340 Q 200 230 300 130" stroke="#FF7800" stroke-width="0.8" stroke-opacity="0.2" stroke-dasharray="1 3" />
-              <path d="M340 340 Q 420 240 520 110" stroke="#FF7800" stroke-width="0.8" stroke-opacity="0.22" stroke-dasharray="1 3" />
-              <path d="M600 340 Q 680 240 780 120" stroke="#FF7800" stroke-width="0.9" stroke-opacity="0.25" stroke-dasharray="1 3" />
-              <path d="M888 340 Q 940 240 1020 140" stroke="#FF7800" stroke-width="0.9" stroke-opacity="0.25" stroke-dasharray="1 3" />
-              <path d="M1176 340 Q 1230 240 1300 130" stroke="#FF7800" stroke-width="0.9" stroke-opacity="0.25" stroke-dasharray="1 3" />
-              <path d="M1440 340 Q 1500 230 1560 120" stroke="#FF7800" stroke-width="0.8" stroke-opacity="0.22" stroke-dasharray="1 3" />
-              <path d="M1660 340 Q 1710 230 1760 110" stroke="#FF7800" stroke-width="0.8" stroke-opacity="0.2" stroke-dasharray="1 3" />
-              <!-- Water Surface Reflection Glow -->
-              <rect y="175" width="1776" height="165" fill="url(#waveReflectGrad)" />
-            </svg>
-          </div>
+    <main class="lt-table" id="dropzone" aria-labelledby="table-heading">
+      <ul class="lt-seats" id="participant-list" aria-label="Devices at the table"></ul>
+      <div class="lt-table-scroll" id="table-scroll">
+      {{template "lt-tabletop" .}}
+      <div class="lt-empty" id="table-empty" hidden>
+        <h2>The table is empty.</h2>
+        <p>Lay files on the table or write a note. Everything you put here appears on the other devices at the table.</p>
+        <div class="lt-empty-actions">
+          <button type="button" class="lt-btn lt-btn-primary lt-btn-lg" id="empty-add-btn">Lay files on the table</button>
         </div>
-
-        <!-- Main Centered Join Card -->
-        <div class="pin-join-card">
-          <div class="pin-lock-circle">
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-            </svg>
-          </div>
-
-          <div class="pin-eyebrow font-mono">PRIVATE ROOM</div>
-
-          <h1 class="pin-main-title font-sans">
-            <span class="title-white">Join a </span><span class="title-orange">Room</span>
-          </h1>
-
-          <p class="pin-card-desc">Enter the PIN code provided by the room creator<br>to continue.</p>
-
-          <form id="pin-form" method="POST" action="/api/v1/rooms/{{.ParticipantToken}}/auth/pin" class="pin-entry-form-cinematic" novalidate>
-            <div class="pin-label-row">
-              <span class="pin-label-text font-mono">ROOM PIN</span>
-              <span class="pin-digits-hint font-mono">
-                4–8 digits
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-              </span>
-            </div>
-
-            <!-- 8-Slot PIN Input Grid -->
-            <div class="pin-slots-wrapper" tabindex="0" id="pin-slots-wrapper">
-              <div class="pin-slots-grid" id="pin-slots-grid">
-                <div class="pin-slot active" data-index="0"><span class="pin-caret"></span></div>
-                <div class="pin-slot" data-index="1"><span class="pin-dot">•</span></div>
-                <div class="pin-slot" data-index="2"><span class="pin-dot">•</span></div>
-                <div class="pin-slot" data-index="3"><span class="pin-dot">•</span></div>
-                <div class="pin-slot" data-index="4"><span class="pin-dot">•</span></div>
-                <div class="pin-slot" data-index="5"><span class="pin-dot">•</span></div>
-                <div class="pin-slot" data-index="6"><span class="pin-dot">•</span></div>
-                <div class="pin-slot" data-index="7"><span class="pin-dot">•</span></div>
-              </div>
-              <input type="password" id="participant-pin-input" name="pin" maxlength="8" inputmode="numeric" pattern="[0-9]{4,8}" autocomplete="off" required class="pin-hidden-input" aria-label="Room PIN">
-            </div>
-
-            <button type="submit" id="unlock-btn" class="btn-join-room font-sans">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
-              <span id="unlock-btn-text">Join Room</span>
-              <svg class="btn-join-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-                <polyline points="12 5 19 12 12 19"></polyline>
-              </svg>
-            </button>
-
-            <div id="pin-error" class="pin-error-box" style="display: none;">
-              <svg class="pin-error-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-              </svg>
-              <span id="pin-error-text">Incorrect PIN. Please try again.</span>
-            </div>
-
-            <div id="pin-cooldown" class="pin-cooldown-box" style="{{if not .IsLocked}}display: none;{{end}}">
-              <span id="pin-cooldown-text">Too many failed attempts. Cooldown active.</span>
-            </div>
-          </form>
-        </div>
-
-        <!-- Feature Indicators (3 Columns with Dividers) -->
-        <div class="pin-features-row">
-          <div class="pin-feature-item">
-            <div class="pin-feature-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
-            </div>
-            <div class="pin-feature-text">
-              <div class="pin-feature-title">PIN Protected</div>
-              <div class="pin-feature-sub">Temporary access</div>
-            </div>
-          </div>
-
-          <div class="pin-feature-divider"></div>
-
-          <div class="pin-feature-item">
-            <div class="pin-feature-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-              </svg>
-            </div>
-            <div class="pin-feature-text">
-              <div class="pin-feature-title">Local Network</div>
-              <div class="pin-feature-sub">Private transfer</div>
-            </div>
-          </div>
-
-          <div class="pin-feature-divider"></div>
-
-          <div class="pin-feature-item">
-            <div class="pin-feature-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-              </svg>
-            </div>
-            <div class="pin-feature-text">
-              <div class="pin-feature-title">Auto Expiring</div>
-              <div class="pin-feature-sub">Temporary room</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Bottom Version & HAMAL Branding -->
-        <div class="pin-bottom-bar">
-          <div class="pin-version font-mono">v0.8.14</div>
-          <div class="pin-brand-accent">
-            <span class="pin-brand-name font-sans">HAMAL</span>
-            <span class="pin-accent-line"></span>
-          </div>
-        </div>
-      </section>
-
-      <!-- Active Participant Room Container -->
-      <div class="client-main-container" style="{{if and .PinRequired (not .PinAuthenticated)}}display: none;{{end}}">
-        <!-- Active Participant Room Section -->
-        <div id="room-active-card" class="client-active-room-section" style="{{if or (and .PinRequired (not .PinAuthenticated)) .Inactive}}display: none;{{end}}">
-          <!-- Room Closing Card (Server Authoritative 10s Countdown) -->
-          <div id="room-closing-card" class="pin-join-card closing-main-card" style="{{if ne .Status "closing"}}display: none;{{end}}">
-            <div class="pin-lock-circle closing-power-badge">
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-                <line x1="12" y1="2" x2="12" y2="12"></line>
-              </svg>
-            </div>
-
-            <div class="pin-eyebrow font-mono">CLOSING ROOM</div>
-
-            <h1 class="pin-main-title font-sans">
-              <span class="title-white">Room will close </span><span class="title-orange">soon</span>
-            </h1>
-
-            <p class="pin-card-desc">The room is being closed. New transfers are no<br>longer accepted.</p>
-
-            <!-- Dynamic Countdown Gauge -->
-            <div class="closing-progress-wrap">
-              <svg class="closing-progress-ring-svg" viewBox="0 0 172 172">
-                <circle class="ring-bg" cx="86" cy="86" r="72"></circle>
-                <circle id="closing-ring-fill" class="ring-fill" cx="86" cy="86" r="72"></circle>
-              </svg>
-              <div class="closing-center-meta">
-                <div id="closing-countdown" class="closing-number">{{if .ClosingRemainingSeconds}}{{.ClosingRemainingSeconds}}{{else}}10{{end}}</div>
-                <div class="closing-meta-lbl font-mono">SECONDS</div>
-                <div class="closing-meta-lbl font-mono">REMAINING</div>
-              </div>
-            </div>
-
-            <!-- Informational Message Box -->
-            <div class="closing-info-banner">
-              <svg class="closing-info-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="16" x2="12" y2="12"></line>
-                <line x1="12" y1="8" x2="12.01" y2="8"></line>
-              </svg>
-              <span class="closing-info-text">When the countdown ends, the room and all of its files are deleted.<br>Transfers that have not finished by then are lost.</span>
-            </div>
-          </div>
-
-          <!-- Room Status Card with Glow & Dual Metrics -->
-          <div class="client-room-status-card" style="{{if eq .Status "closing"}}display: none;{{end}}">
-            <div class="client-status-card-header">
-              <div class="client-status-dot-title">
-                <span class="status-indicator-dot green"></span>
-                <span class="client-status-text font-mono">ROOM ACTIVE</span>
-                <span id="status-badge" style="display: none;">ROOM ACTIVE</span>
-              </div>
-              {{if .PinRequired}}
-              <div class="client-pin-tag">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                <span>PIN Protected</span>
-              </div>
-              {{end}}
-            </div>
-
-            <div class="client-dual-metrics">
-              <div class="client-metric-col">
-                <div class="client-metric-icon icon-amber">
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                </div>
-                <div class="client-metric-text-group">
-                  <span id="countdown" class="client-metric-num font-mono">--:--</span>
-                  <span class="client-metric-lbl font-mono">REMAINING</span>
-                </div>
-              </div>
-
-              <div class="client-metric-divider"></div>
-
-              <div class="client-metric-col">
-                <div class="client-metric-icon icon-light">
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                </div>
-                <div class="client-metric-text-group">
-                  <span id="participant-count-val" class="client-metric-num font-mono">{{.ParticipantCount}}</span>
-                  <span class="client-metric-lbl font-mono">CONNECTED</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Sharing Mode Switcher (Files vs Text) -->
-          <div class="client-mode-tabs" role="tablist" aria-label="Sharing Mode" style="{{if eq .Status "closing"}}display: none;{{end}}">
-            <button type="button" id="tab-files" class="client-tab-btn active" role="tab" aria-selected="true" aria-controls="files-mode-container">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-              <span id="tab-files-label">Files</span>
-              <span id="tab-files-badge" class="client-tab-badge active">{{len .Files}}</span>
-            </button>
-            <button type="button" id="tab-text" class="client-tab-btn" role="tab" aria-selected="false" aria-controls="text-mode-container">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-              <span id="tab-text-label">Text</span>
-              <span id="tab-text-badge" class="client-tab-badge">{{len .Texts}}</span>
-            </button>
-          </div>
-
-          <!-- Files Mode Container -->
-          <div id="files-mode-container" class="client-tab-panel active" style="{{if eq .Status "closing"}}display: none;{{end}}">
-            <!-- Upload Dropzone Card -->
-            <div id="dropzone" class="client-dropzone-card" role="button" tabindex="0" onclick="document.getElementById('file-input').click()">
-              <div class="client-dropzone-icon">
-                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="17 8 12 3 7 8"></polyline>
-                  <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
-              </div>
-              <div id="dropzone-title" class="client-dropzone-title font-sans">UPLOAD FILES</div>
-              <div class="client-dropzone-sub">Tap or drag files here</div>
-              <input type="file" id="file-input" multiple style="display: none;">
-
-              <div id="upload-progress-container" class="client-upload-progress" style="display: none;">
-                <div class="upload-progress-info">
-                  <span id="upload-filename">Uploading file…</span>
-                  <span id="upload-percent" class="font-mono">0%</span>
-                </div>
-                <div class="progress-track">
-                  <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Files Section Panel -->
-            <div class="client-files-panel">
-              <div class="client-panel-header">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                <span class="client-panel-title font-mono">FILES (<span id="file-count">{{len .Files}}</span>)</span>
-              </div>
-
-              <div id="file-list" class="client-file-list">
-                {{if eq (len .Files) 0}}
-                <div id="no-files-msg" class="client-empty-state">
-                  <div class="empty-folder-icon">
-                    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#6F767D" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                  </div>
-                  <div class="empty-title">Nothing here yet.</div>
-                  <div class="empty-sub">Waiting for files. Drag files above or send parcels from your phone.</div>
-                </div>
-                {{else}}
-                  {{range .Files}}
-                  <div class="file-item" data-file-id="{{.ID}}">
-                    <div class="file-item-main">
-                      <div class="file-type-icon cat-generic">
-                        <svg class="pixel-icon pixel-icon-generic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                      </div>
-                      <div class="file-info">
-                        <span class="file-name" title="{{.OriginalFilename}}">{{.OriginalFilename}}</span>
-                        <span class="file-meta font-mono">{{.SizeBytes}} B</span>
-                      </div>
-                    </div>
-                    <div class="file-actions">
-                      <a href="/api/v1/rooms/{{$.ParticipantToken}}/files/{{.ID}}" download="{{.OriginalFilename}}" class="btn-download-icon btn-download" title="Download">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                          <polyline points="7 10 12 15 17 10"></polyline>
-                          <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
-                      </a>
-                    </div>
-                  </div>
-                  {{end}}
-                {{end}}
-              </div>
-            </div>
-          </div>
-
-          <!-- Text Mode Container -->
-          <div id="text-mode-container" class="client-tab-panel" style="display: none;">
-            <!-- Text Compose Card -->
-            <div class="text-compose-card">
-              <div class="text-compose-header">
-                <label for="text-input" id="text-compose-label" class="text-compose-title font-sans">SEND TEXT OR LINK</label>
-                <span id="text-size-counter" class="text-counter font-mono">0 / 64 KB</span>
-              </div>
-              <div class="text-input-wrap">
-                <textarea id="text-input" class="text-textarea font-sans" placeholder="Type or paste text, URLs, or notes here…" maxlength="65536" rows="3" aria-label="Text message content"></textarea>
-              </div>
-              <div class="text-compose-actions">
-                <span id="text-compose-error" class="text-error-hint" style="display: none;"></span>
-                <button type="button" id="send-text-btn" class="btn btn-primary btn-send-text">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                  </svg>
-                  <span id="send-text-label">Send Text</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Text Messages List -->
-            <div class="texts-section">
-              <div class="client-panel-header">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF7800" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                <span class="client-panel-title font-mono">MESSAGES ( <span id="text-count">{{len .Texts}}</span> )</span>
-              </div>
-              <div id="text-list" class="text-list">
-                {{if eq (len .Texts) 0}}
-                <div id="no-texts-msg" class="client-empty-state">
-                  <p class="empty-title" id="no-texts-title">No text messages yet.</p>
-                  <p class="empty-sub" id="no-texts-desc">Paste commands, logs, snippets, or URLs to share directly.</p>
-                </div>
-                {{else}}
-                  {{range .Texts}}
-                  <div class="text-item-card sender-{{.SenderType}}" data-text-id="{{.ID}}">
-                    <div class="text-item-header">
-                      <div class="text-sender-tag {{.SenderType}}">
-                        <span class="sender-role font-mono">{{if eq .SenderType "server"}}SERVER{{else}}CLIENT{{end}}</span>
-                      </div>
-                      {{if ne .SenderType "server"}}
-                      <button type="button" class="btn-copy-text" title="Copy" aria-label="Copy message text">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                        <span class="copy-label">Copy</span>
-                      </button>
-                      {{end}}
-                    </div>
-                    <div class="text-item-content font-mono">{{.Content}}</div>
-                  </div>
-                  {{end}}
-                {{end}}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Room Closed / Inactive State Card -->
-        <section id="room-inactive-card" class="client-inactive-card" style="{{if not .Inactive}}display: none;{{end}}">
-          <div class="inactive-icon-wrapper">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-          </div>
-          <h2 id="inactive-title" class="inactive-title font-sans">Room Closed</h2>
-          <p id="inactive-message" class="inactive-message">This temporary room is no longer accessible.</p>
-          <div class="inactive-actions">
-            <a href="/" class="btn btn-primary btn-full">Create a New Room</a>
-          </div>
-        </section>
+      </div>
+      <aside class="lt-log" aria-label="Room log">
+        <ol id="activity-list"></ol>
+      </aside>
       </div>
     </main>
+
+    {{template "lt-composer" .}}
+    {{template "lt-dock" .}}
   </div>
 
-  <!-- File Preview Overlay -->
-  <div id="file-preview-overlay" class="preview-overlay hidden" role="dialog" aria-modal="true" aria-label="File preview">
-    <div class="preview-header">
-      <span class="preview-filename" id="preview-filename"></span>
-      <button type="button" class="preview-close-btn" id="preview-close-btn" title="Close preview">✕</button>
-    </div>
-    <div class="preview-body" id="preview-body"></div>
-  </div>
+  {{template "lt-end" .}}
+  {{template "lt-shared-overlays" .}}
 </body>
 </html>
 {{end}}

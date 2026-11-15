@@ -43,19 +43,25 @@ const (
 	stateShare             = "share"
 )
 
-// siteJSIDContract lists every id that site.js reads with getElementById and the page states in
-// which the baseline templates render it.
+// siteJSIDContract lists every id that site.js (getElementById) or room.js ($('id')) reads, and the
+// page states that render it. The Light Table room pages replaced the room markup: contract change.
 var siteJSIDContract = []struct {
 	ID     string
 	States []string
 }{
-	{"activity-list", []string{"creator", "creator-sharing"}},
+	{"activity-list", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"add-files-btn", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"btn-clear-activity", []string{"creator", "creator-sharing"}},
-	{"btn-copy-all-participants", []string{"creator", "creator-sharing"}},
+	{"bulk-note", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"capacity", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"close-error", []string{"creator", "creator-sharing"}},
+	{"closing-countdown", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"close-modal-btn", []string{"creator-sharing"}},
 	{"close-room-btn", []string{"creator", "creator-sharing"}},
-	{"closing-countdown", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"closing-ring-fill", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"composer", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"composer-backdrop", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"composer-cancel", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"composer-hint", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"confirm-close-btn", []string{"creator", "creator-sharing"}},
 	{"copy-link-btn", []string{"creator", "creator-sharing"}},
 	{"copy-share-btn", []string{"creator-sharing"}},
@@ -65,40 +71,44 @@ var siteJSIDContract = []struct {
 	{"create-room-form", []string{"home"}},
 	{"create-share-form", []string{"creator-sharing"}},
 	{"create-submit-btn", []string{"home"}},
-	{"creator-files-section", []string{"creator", "creator-sharing"}},
-	{"creator-text-compose", []string{"creator", "creator-sharing"}},
-	{"creator-texts-section", []string{"creator", "creator-sharing"}},
 	{"dropzone", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"dropzone-title", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"file-count", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"empty-add-btn", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"empty-qr-btn", []string{"creator", "creator-sharing"}},
+	{"expiry-slot", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"file-input", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"file-list", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"file-preview-overlay", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"files-mode-container", []string{"participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"form-error", []string{"home"}},
 	{"generate-share-btn", []string{"creator-sharing"}},
 	{"generated-share-input", []string{"creator-sharing"}},
+	{"inactive-downloads", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"inactive-message", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"inactive-title", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"metric-connected-count", []string{"creator", "creator-sharing"}},
-	{"metric-transferred-size", []string{"creator", "creator-sharing"}},
-	{"modal-about-close", []string{"creator", "creator-sharing", "home"}},
-	{"modal-about-dismiss", []string{"creator", "creator-sharing", "home"}},
-	{"modal-backdrop", []string{"creator", "creator-sharing", "home"}},
+	{"kind-chips", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"kind-select", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"lamp", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"lamp-fill", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"lamp-label", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"lamp-left", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"lamp-meter", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"list-bar", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"list-head", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"modal-about-close", []string{"home"}},
+	{"modal-about-dismiss", []string{"home"}},
+	{"modal-backdrop", []string{"home"}},
 	{"modal-close-cancel", []string{"creator", "creator-sharing"}},
+	{"modal-close-confirm", []string{"creator", "creator-sharing"}},
 	{"modal-file-id", []string{"creator-sharing"}},
 	{"modal-file-subtitle", []string{"creator-sharing"}},
-	{"modal-qr-close", []string{"creator", "creator-sharing"}},
-	{"nav-btn-about", []string{"creator", "creator-sharing", "home"}},
-	{"nav-btn-files", []string{"creator", "creator-sharing", "home"}},
-	{"nav-btn-room", []string{"creator", "creator-sharing", "home"}},
-	{"nav-btn-texts", []string{"creator", "creator-sharing"}},
-	{"nav-file-count", []string{"creator", "creator-sharing", "home"}},
-	{"nav-text-count", []string{"creator", "creator-sharing"}},
+	{"nav-btn-about", []string{"home"}},
+	{"nav-btn-files", []string{"home"}},
+	{"nav-btn-room", []string{"home"}},
+	{"nav-file-count", []string{"home"}},
+	{"no-match", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"participant-count", []string{"creator", "creator-sharing"}},
 	{"participant-count-val", []string{"participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"participant-link-input", []string{"creator", "creator-sharing"}},
-	{"participant-list", []string{"creator", "creator-sharing"}},
+	{"participant-list", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"participant-pin-input", []string{"participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"pin-barrier-card", []string{"participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"pin-cooldown", []string{"participant", "participant-pin-authenticated", "participant-pin-locked"}},
@@ -108,53 +118,101 @@ var siteJSIDContract = []struct {
 	{"pin-eye-icon", []string{"home"}},
 	{"pin-form", []string{"participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"pin-input", []string{"home"}},
-	{"pin-slots-wrapper", []string{"participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"pin-toggle-btn", []string{"home"}},
 	{"preview-body", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"preview-close-btn", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"preview-filename", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"progress-bar-fill", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"qr-box", []string{"creator", "creator-sharing"}},
+	{"qr-dialog", []string{"creator", "creator-sharing"}},
+	{"qr-done-btn", []string{"creator", "creator-sharing"}},
 	{"qr-image", []string{"creator", "creator-sharing"}},
-	{"qr-lightbox-box", []string{"creator", "creator-sharing"}},
+	{"qr-lamp", []string{"creator", "creator-sharing"}},
+	{"qr-seats", []string{"creator", "creator-sharing"}},
 	{"room-active-card", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"room-closing-card", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"room-inactive-card", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"room-menu", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"room-menu-btn", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"save-selected-btn", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"search-input", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"select-all", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"send-as-file-btn", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"send-text-btn", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"send-text-label", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"share-error-box", []string{"creator-sharing"}},
+	{"share-modal", []string{"creator-sharing"}},
 	{"share-result-box", []string{"creator-sharing"}},
 	{"share-ttl-select", []string{"creator-sharing"}},
-	{"status-badge", []string{"participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"tab-files", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"tab-text", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"tab-text-badge", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"shortcuts-close", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"shortcuts-dialog", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"show-qr-btn", []string{"creator", "creator-sharing"}},
+	{"sort-select", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"table-empty", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"table-scroll", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"table-heading", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"text-compose-error", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"text-count", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"text-input", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"text-list", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"text-mode-container", []string{"participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"text-overlimit", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"text-overlimit-msg", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"text-size-counter", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"theme-btn-dark", []string{"creator", "creator-sharing", "home"}},
-	{"theme-btn-light", []string{"creator", "creator-sharing", "home"}},
+	{"theme-btn-dark", []string{"creator", "creator-sharing", "home", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"theme-btn-light", []string{"creator", "creator-sharing", "home", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"theme-toggle-btn", []string{"share"}},
+	{"tray-list", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"tray-summary", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"tray-toggle", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"ttl-select", []string{"home"}},
 	{"unlock-btn", []string{"participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"unlock-btn-text", []string{"participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"upload-error", []string{"creator", "creator-sharing"}},
-	{"upload-filename", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"upload-percent", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
-	{"upload-progress-container", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"upload-tray", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"view-list", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"view-table", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"viewer-count", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"viewer-next", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"viewer-note", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"viewer-prev", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"viewer-save", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
+	{"write-note-btn", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 }
 
-// siteJSIDsNotInTemplates are ids site.js looks up that no baseline template renders. site.js
-// treats them as optional (null-guarded fallbacks or elements created at runtime).
+// siteJSIDsNotInTemplates are ids site.js or room.js look up that no template renders: optional
+// fallbacks, elements created at runtime, and ids of the legacy room UI that the Light Table room
+// pages replaced (site.js returns before that code on body.lt pages).
 var siteJSIDsNotInTemplates = map[string]string{
-	"card-inactive":     "fallback for room-inactive-card; null-guarded",
-	"create-btn":        "fallback for create-submit-btn; null-guarded",
-	"create-room-error": "fallback for form-error; null-guarded",
-	"room-pin-card":     "fallback for pin-barrier-card; null-guarded",
-	"room-pin-input":    "fallback for pin-input; null-guarded",
-	"room-ttl-select":   "fallback for ttl-select; null-guarded",
+	"btn-copy-all-participants": "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"card-inactive":             "fallback for room-inactive-card; null-guarded",
+	"closing-ring-fill":         "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"create-btn":                "fallback for create-submit-btn; null-guarded",
+	"create-room-error":         "fallback for form-error; null-guarded",
+	"creator-files-section":     "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"creator-text-compose":      "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"creator-texts-section":     "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"dropzone-title":            "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"expiry-visible":            "created by room.js inside the expiry banner",
+	"file-count":                "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"files-mode-container":      "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"metric-connected-count":    "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"metric-transferred-size":   "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"modal-qr-close":            "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"nav-btn-texts":             "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"nav-text-count":            "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"pin-slots-wrapper":         "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"progress-bar-fill":         "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"qr-box":                    "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"qr-lightbox-box":           "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"room-pin-card":             "fallback for pin-barrier-card; null-guarded",
+	"room-pin-input":            "fallback for pin-input; null-guarded",
+	"room-ttl-select":           "fallback for ttl-select; null-guarded",
+	"status-badge":              "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"tab-files":                 "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"tab-text":                  "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"tab-text-badge":            "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"text-list":                 "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"text-mode-container":       "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"upload-error":              "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"upload-filename":           "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"upload-percent":            "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
+	"upload-progress-container": "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
 }
 
 // bodyDataContract lists the data-* attributes on <body> for each page state.
@@ -173,6 +231,8 @@ var (
 	bodyTagRe    = regexp.MustCompile(`(?s)<body\b[^>]*>`)
 	dataAttrRe   = regexp.MustCompile(`\bdata-([a-z0-9-]+)=`)
 	getByIDLitRe = regexp.MustCompile(`getElementById\(\s*['"]([^'"]+)['"]\s*\)`)
+	// room.js (Light Table room pages) looks elements up with its $('id') helper.
+	roomJSIDRe = regexp.MustCompile(`\$\(\s*'([a-z0-9-]+)'\s*\)`)
 )
 
 func contractGet(t *testing.T, a *App, path string, cookies ...*http.Cookie) string {
@@ -262,13 +322,22 @@ func bodyDataIn(t *testing.T, html string) []string {
 
 func siteJSIDs(t *testing.T) []string {
 	t.Helper()
+	seen := map[string]bool{}
 	src, err := os.ReadFile("static/site.js")
 	if err != nil {
 		t.Fatal(err)
 	}
-	seen := map[string]bool{}
 	for _, m := range getByIDLitRe.FindAllStringSubmatch(string(src), -1) {
 		seen[m[1]] = true
+	}
+	room, err := os.ReadFile("static/room.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, re := range []*regexp.Regexp{getByIDLitRe, roomJSIDRe} {
+		for _, m := range re.FindAllStringSubmatch(string(room), -1) {
+			seen[m[1]] = true
+		}
 	}
 	ids := make([]string, 0, len(seen))
 	for id := range seen {

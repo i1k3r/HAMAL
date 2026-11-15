@@ -13,8 +13,8 @@ test.describe('languages', () => {
       // The first render comes from the Go template in English; site.js re-renders the list with
       // translated labels on the first poll (baseline behaviour).
       await waitForPolls(page, 1);
-      await page.locator('#tab-text').click();
-      const card = page.locator('#text-list .text-item-card', { hasText: 'translated page check' });
+      await page.locator('#write-note-btn').click();
+      const card = page.locator('#file-list .text-item-card', { hasText: 'translated page check' });
       const copyLabel = (await card.locator('.copy-label').textContent())?.trim();
       expect(copyLabel).toBeTruthy();
       expect(copyLabel).not.toBe('Copy');
@@ -32,8 +32,8 @@ test.describe('languages', () => {
     await mustPostText(room, 'fallback check');
     await page.goto(`${room.base}/r/${room.participant_token}`);
     await waitForPolls(page, 1);
-    await page.locator('#tab-text').click();
-    const card = page.locator('#text-list .text-item-card', { hasText: 'fallback check' });
+    await page.locator('#write-note-btn').click();
+    const card = page.locator('#file-list .text-item-card', { hasText: 'fallback check' });
     await expect(card.locator('.copy-label')).toHaveText('Copy');
     await context.close();
   });

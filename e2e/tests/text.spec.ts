@@ -1,4 +1,4 @@
-import { test, expect, knownFailure } from './support/fixtures';
+import { test, expect } from './support/fixtures';
 import { createRoom, mustPostText, postText, getJSON } from './support/api';
 
 test.describe('text notes', () => {
@@ -7,22 +7,22 @@ test.describe('text notes', () => {
     const creatorCtx = await browser.newContext();
     const creator = await creatorCtx.newPage();
     await creator.goto(`${room.base}/c/${room.creator_token}`);
-    await creator.locator('#tab-text').click();
+    await creator.locator('#write-note-btn').click();
 
     const phone = await browser.newPage();
     await phone.goto(`${room.base}/r/${room.participant_token}`);
-    await phone.locator('#tab-text').click();
+    await phone.locator('#write-note-btn').click();
     await phone.locator('#text-input').fill('first from phone');
     await phone.locator('#send-text-btn').click();
     await expect(phone.locator('#text-input')).toHaveValue('');
     await phone.locator('#text-input').fill('second from phone');
     await phone.locator('#send-text-btn').click();
 
-    const cards = creator.locator('#text-list .text-item-card');
+    const cards = creator.locator('#file-list .text-item-card');
     await expect(cards.first()).toContainText('second from phone', { timeout: 12_000 });
     await expect(cards.nth(1)).toContainText('first from phone');
     // Sender's own notes are marked as self; the other device sees them as a peer's.
-    await expect(phone.locator('#text-list .text-item-card').first()).toHaveClass(/client-self/);
+    await expect(phone.locator('#file-list .text-item-card').first()).toHaveClass(/client-self/);
     await expect(cards.first()).toHaveClass(/client-peer/);
     await creatorCtx.close();
     await phone.close();
@@ -31,7 +31,7 @@ test.describe('text notes', () => {
   test('the size counter tracks bytes and blocks text over the limit', async ({ page }) => {
     const room = await createRoom();
     await page.goto(`${room.base}/r/${room.participant_token}`);
-    await page.locator('#tab-text').click();
+    await page.locator('#write-note-btn').click();
     const counter = page.locator('#text-size-counter');
     await expect(counter).toHaveText('0 B / 64 KB');
 
@@ -58,8 +58,8 @@ test.describe('text notes', () => {
     const room = await createRoom();
     await mustPostText(room, 'kubectl get pods -A');
     await page.goto(`${room.base}/c/${room.creator_token}`);
-    await page.locator('#tab-text').click();
-    const card = page.locator('#text-list .text-item-card', { hasText: 'kubectl get pods -A' });
+    await page.locator('#write-note-btn').click();
+    const card = page.locator('#file-list .text-item-card', { hasText: 'kubectl get pods -A' });
     await card.locator('.btn-copy-text').click();
     await expect(card.locator('.copy-label')).toHaveText('Copied!');
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('kubectl get pods -A');
@@ -77,17 +77,13 @@ test.describe('text notes', () => {
     const room = await createRoom();
     await mustPostText(room, 'secret-token-123');
     await page.goto(`${room.base}/c/${room.creator_token}`);
-    await page.locator('#tab-text').click();
-    const card = page.locator('#text-list .text-item-card', { hasText: 'secret-token-123' });
+    await page.locator('#write-note-btn').click();
+    const card = page.locator('#file-list .text-item-card', { hasText: 'secret-token-123' });
     await card.locator('.btn-copy-text').click();
     await page.waitForTimeout(300);
 
-    await knownFailure('KF-004', async () => {
-      await expect(
-        card.locator('.copy-label'),
-        'KF-004: Copy must not report success when every copy method failed',
-      ).not.toHaveText('Copied!', { timeout: 1_000 });
-    });
+    // Formerly KF-004: the label says the copy failed instead of claiming success.
+    await expect(card.locator('.copy-label'), 'Copy must not report success when every copy method failed').toHaveText("Couldn't copy");
   });
 
   test('at 200 notes the welcome message is evicted and the next note is refused', async ({ page }) => {
@@ -108,14 +104,14 @@ test.describe('text notes', () => {
     expect(refused.json.error).toBe('room text message limit reached');
 
     await page.goto(`${room.base}/r/${room.participant_token}`);
-    await page.locator('#tab-text').click();
-    await expect(page.locator('#text-list .text-item-card')).toHaveCount(200);
-    await expect(page.locator('#text-list .text-item-card').first()).toContainText('bulk note 199');
+    await page.locator('#write-note-btn').click();
+    await expect(page.locator('#file-list .text-item-card')).toHaveCount(200);
+    await expect(page.locator('#file-list .text-item-card').first()).toContainText('bulk note 199');
     await expect(page.locator('#text-count')).toHaveText('200');
 
     await page.locator('#text-input').fill('one more from the phone');
     await page.locator('#send-text-btn').click();
     await expect(page.locator('#text-compose-error')).toHaveText('room text message limit reached');
-    await expect(page.locator('#text-list .text-item-card')).toHaveCount(200);
+    await expect(page.locator('#file-list .text-item-card')).toHaveCount(200);
   });
 });

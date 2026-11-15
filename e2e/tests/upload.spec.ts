@@ -52,7 +52,7 @@ test.describe('upload', () => {
     // The handoff's feature table says the opposite; see the Phase 0 report.
     const room = await createRoom();
     await page.goto(`${room.base}/r/${room.participant_token}`);
-    await page.locator('#tab-text').click();
+    await page.locator('#write-note-btn').click();
     await pasteImage(page, '#text-input');
     await page.waitForTimeout(1_500);
     expect(await serverFiles(room)).toEqual([]);
@@ -69,10 +69,16 @@ test.describe('upload', () => {
       await route.continue();
     });
     await page.locator('#file-input').setInputFiles({ name: 'slow.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(64 * 1024) });
-    await expect(page.locator('#upload-progress-container')).toBeVisible();
-    await expect(page.locator('#upload-filename')).toHaveText('slow.bin');
+    const tray = page.locator('#upload-tray');
+    await expect(tray).toBeVisible();
+    const row = tray.locator('.lt-up', { hasText: 'slow.bin' });
+    await expect(row.locator('.lt-up-status')).toContainText(/^Sending \d+%/);
+    await expect(page.locator('#tray-summary')).toHaveText('Sending 1 of 1');
     release();
     await expect(page.locator('#file-list .file-row')).toHaveCount(1, { timeout: 12_000 });
-    await expect(page.locator('#upload-progress-container')).toBeHidden();
+    await expect(row.locator('.lt-up-status')).toHaveText('Sent');
+    await expect(page.locator('#tray-summary')).toHaveText('All 1 sent');
+    // The tray folds down to its summary a few seconds after everything was sent.
+    await expect(tray).toHaveClass(/is-collapsed/, { timeout: 8_000 });
   });
 });

@@ -9,7 +9,6 @@ import { createRoom } from './support/api';
 
 const PAGES = [
   { name: 'home', url: (_: any) => 'http://127.0.0.1:7799/' },
-  { name: 'creator', url: (r: any) => `${r.base}/c/${r.creator_token}` },
 ] as const;
 
 for (const p of PAGES) {
@@ -34,3 +33,13 @@ for (const p of PAGES) {
     expect(rowBox.height).toBeLessThanOrEqual(Math.max(pill.height, settings.height) + 1);
   });
 }
+
+test('the Light Table room pages show no version label in their chrome', async ({ page }) => {
+  const room = await createRoom();
+  for (const url of [`${room.base}/c/${room.creator_token}`, `${room.base}/r/${room.participant_token}`]) {
+    await page.goto(url);
+    await expect(page.locator('.sidebar-version-tag')).toHaveCount(0);
+    await expect(page.locator('#room-active-card .lt-top')).not.toContainText(/v\d+\.\d+\.\d+/);
+    await expect(page.locator('.lt-dock')).not.toContainText(/v\d+\.\d+\.\d+/);
+  }
+});

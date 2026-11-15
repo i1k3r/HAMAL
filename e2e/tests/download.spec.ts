@@ -15,11 +15,11 @@ test.describe('download', () => {
     const [download] = await Promise.all([page.waitForEvent('download'), row.locator('a[download]').click()]);
     expect(download.suggestedFilename()).toBe('Quarterly Report (final).txt');
     expect(fs.readFileSync(await download.path(), 'utf8')).toBe('numbers go here');
-    await expect(row.locator('a[download]')).toHaveText('✓ Saved');
+    await expect(row.locator('a[download]')).toHaveText('Save again');
 
     // The mark lives in sessionStorage, so it survives a reload of the same tab.
     await page.reload();
-    await expect(page.locator('#file-list .file-row', { hasText: 'Quarterly Report (final).txt' }).locator('a[download]')).toHaveText('✓ Saved');
+    await expect(page.locator('#file-list .file-row', { hasText: 'Quarterly Report (final).txt' }).locator('a[download]')).toHaveText('Save again');
   });
 
   test('risky file types carry the executable warning', async ({ page }) => {

@@ -879,6 +879,13 @@
 
     const t = PARTICIPANT_I18N[resolveLocaleKey()] || PARTICIPANT_I18N.en;
 
+    // Light Table room pages (body.lt) are driven by room.js. Share the translation table with it
+    // and stop here, so the legacy room code below never runs against the new markup.
+    if (document.body.classList.contains('lt')) {
+      window.HAMAL_I18N = { table: PARTICIPANT_I18N, locale: resolveLocaleKey() };
+      return;
+    }
+
     // Pixel-Art Category SVGs matching Windows Master Reference
     const PIXEL_ICONS = {
       image: `<svg class="pixel-icon pixel-icon-image" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Image"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>`,

@@ -11,7 +11,7 @@ test.describe('media previews', () => {
     const room = await createRoom();
     await mustUpload(room, 'pixel.png', PNG_1PX, { type: 'image/png' });
     await page.goto(`${room.base}/r/${room.participant_token}`);
-    await page.getByRole('button', { name: 'Preview pixel.png' }).click();
+    await page.getByRole('button', { name: 'View pixel.png' }).click();
     const overlay = page.locator('#file-preview-overlay');
     await expect(overlay).toBeVisible();
     await expect(page.locator('#preview-filename')).toHaveText('pixel.png');
@@ -28,7 +28,7 @@ test.describe('media previews', () => {
     const room = await createRoom();
     await mustUpload(room, 'tone.wav', wav(20), { type: 'audio/wav' });
     await page.goto(`${room.base}/r/${room.participant_token}`);
-    await page.getByRole('button', { name: 'Preview tone.wav' }).click();
+    await page.getByRole('button', { name: 'View tone.wav' }).click();
     const audio = page.locator('#preview-body audio');
     await expect(audio).toHaveAttribute('controls', '');
     await audio.evaluate((a: HTMLAudioElement) => a.play());
@@ -44,7 +44,7 @@ test.describe('media previews', () => {
     const room = await createRoom();
     await mustUpload(room, 'clip.webm', clip, { type: 'video/webm' });
     await page.goto(`${room.base}/r/${room.participant_token}`);
-    await page.getByRole('button', { name: 'Preview clip.webm' }).click();
+    await page.getByRole('button', { name: 'View clip.webm' }).click();
     const video = page.locator('#preview-body video');
     await expect(video).toHaveAttribute('controls', '');
     await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(1);
