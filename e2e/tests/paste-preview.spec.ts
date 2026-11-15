@@ -39,7 +39,7 @@ for (const view of VIEWS) {
       expect(download.suggestedFilename()).toBe(files[0].filename);
       expect(fs.readFileSync(await download.path()).equals(PNG_1PX), 'downloaded bytes equal the pasted image').toBe(true);
       // The uploaded image is previewable like any other image.
-      await page.getByRole('button', { name: `Preview ${files[0].filename}` }).click();
+      await page.getByRole('button', { name: `View ${files[0].filename}` }).click();
       await expect(page.locator('#preview-body img')).toBeVisible();
     });
 
@@ -48,14 +48,14 @@ for (const view of VIEWS) {
       await context.grantPermissions(['clipboard-read', 'clipboard-write']);
       const room = await createRoom();
       await page.goto(view.url(room));
-      await page.locator('#tab-text').click();
+      await page.locator('#write-note-btn').click();
       const input = page.locator('#text-input');
       await input.click();
       await page.evaluate(() => navigator.clipboard.writeText('pasted line 1\npasted line 2'));
       await page.keyboard.press('ControlOrMeta+V');
       await expect(input).toHaveValue('pasted line 1\npasted line 2');
       await page.locator('#send-text-btn').click();
-      await expect(page.locator('#text-list .text-item-card').first()).toContainText('pasted line 2', { timeout: 12_000 });
+      await expect(page.locator('#file-list .text-item-card').first()).toContainText('pasted line 2', { timeout: 12_000 });
       await page.waitForTimeout(500);
       expect(await serverFiles(room)).toEqual([]);
     });
@@ -81,7 +81,7 @@ for (const view of VIEWS) {
       await page.goto(view.url(room));
       const overlay = page.locator('#file-preview-overlay');
 
-      await page.getByRole('button', { name: 'Preview pixel.png' }).click();
+      await page.getByRole('button', { name: 'View pixel.png' }).click();
       await expect(overlay).toBeVisible();
       await expect(page.locator('#preview-filename')).toHaveText('pixel.png');
       const img = page.locator('#preview-body img');
@@ -89,14 +89,14 @@ for (const view of VIEWS) {
       await page.keyboard.press('Escape');
       await expect(overlay).toBeHidden();
 
-      await page.getByRole('button', { name: 'Preview clip.webm' }).click();
+      await page.getByRole('button', { name: 'View clip.webm' }).click();
       const video = page.locator('#preview-body video');
       await expect(video).toHaveAttribute('controls', '');
       await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(1);
       await page.keyboard.press('Escape');
       await expect(overlay).toBeHidden();
 
-      await page.getByRole('button', { name: 'Preview tone.wav' }).click();
+      await page.getByRole('button', { name: 'View tone.wav' }).click();
       const audio = page.locator('#preview-body audio');
       await expect(audio).toHaveAttribute('controls', '');
       await expect(page.locator('#preview-filename')).toHaveText('tone.wav');
@@ -110,7 +110,7 @@ for (const view of VIEWS) {
       await page.goto(view.url(room));
       const overlay = page.locator('#file-preview-overlay');
       const open = async () => {
-        await page.getByRole('button', { name: 'Preview clip.webm' }).click();
+        await page.getByRole('button', { name: 'View clip.webm' }).click();
         await expect(overlay).toBeVisible();
         await expect(page.locator('#preview-body video')).toHaveCount(1);
         expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');

@@ -21,10 +21,11 @@ test.describe('upload queue retries and failures', () => {
       await route.continue();
     });
     await page.locator('#file-input').setInputFiles({ name: 'busy.txt', mimeType: 'text/plain', buffer: Buffer.from('busy') });
-    await expect(page.locator('#upload-filename')).toContainText('server busy, retrying in 1s');
+    await expect(page.locator('#tray-list .lt-up', { hasText: 'busy.txt' }).locator('.lt-up-status')).toContainText('server busy, retrying in 1s');
     await expect(page.locator('#file-list .file-row')).toHaveCount(1, { timeout: 15_000 });
     expect(calls).toBe(3);
-    await expect(page.locator('#upload-error')).toBeHidden();
+    await expect(page.locator('#tray-list .lt-up', { hasText: 'busy.txt' }).locator('.lt-up-status')).toHaveText('Sent');
+    await expect(page.locator('#tray-summary')).toHaveText('All 1 sent');
   });
 
   test('after 5 retries a 429 becomes a visible failure', async ({ page }) => {
@@ -41,9 +42,11 @@ test.describe('upload queue retries and failures', () => {
       });
     });
     await page.locator('#file-input').setInputFiles({ name: 'never.txt', mimeType: 'text/plain', buffer: Buffer.from('x') });
-    await expect(page.locator('#upload-error')).toContainText('never.txt: too many requests', { timeout: 20_000 });
+    await expect(page.locator('#tray-list .lt-up', { hasText: 'never.txt' }).locator('.lt-up-status')).toHaveText('Not sent: the server is busy (too many requests)', { timeout: 20_000 });
     expect(calls).toBe(6); // first attempt + MAX_UPLOAD_RETRIES (5)
-    await expect(page.locator('#upload-filename')).toHaveText('1 upload(s) failed');
+    await expect(page.locator('#tray-summary')).toHaveText('0 of 1 sent · 1 not sent');
+    // Only a failure that can still succeed offers Retry.
+    await expect(page.locator('#tray-list .lt-up', { hasText: 'never.txt' }).getByRole('button', { name: 'Retry never.txt' })).toBeVisible();
   });
 
   test('a transport failure is shown and the queue continues', async ({ page }) => {
@@ -57,7 +60,7 @@ test.describe('upload queue retries and failures', () => {
       { name: 'broken.txt', mimeType: 'text/plain', buffer: Buffer.from('b') },
       { name: 'fine.txt', mimeType: 'text/plain', buffer: Buffer.from('f') },
     ]);
-    await expect(page.locator('#upload-error')).toContainText('broken.txt: Upload failed or connection interrupted.');
+    await expect(page.locator('#tray-list .lt-up', { hasText: 'broken.txt' }).locator('.lt-up-status')).toHaveText('Not sent: connection lost');
     await expect(page.locator('#file-list .file-row')).toHaveCount(1, { timeout: 12_000 });
     const files = await getJSON(`${room.base}/api/v1/rooms/${room.participant_token}/files`);
     expect(files.json.files.map((f: any) => f.filename)).toEqual(['fine.txt']);
@@ -81,8 +84,19 @@ test.describe('upload queue retries and failures', () => {
         { name: 'two.txt', mimeType: 'text/plain', buffer: Buffer.from('2') },
         { name: 'three.txt', mimeType: 'text/plain', buffer: Buffer.from('3') },
       ]);
-      await expect(page.locator('#upload-error')).toContainText(`one.txt: refused with ${status}`);
-      await expect(page.locator('#upload-error')).toContainText(`2 remaining file(s) were not uploaded: refused with ${status}`);
+      const one = page.locator('#tray-list .lt-up', { hasText: 'one.txt' }).locator('.lt-up-status');
+      if (status === 401) {
+        await expect(one).toHaveText('Not sent: this device is no longer signed in to the room. Reload to enter the PIN again.');
+      } else {
+        await expect(one).toHaveText(`The room ended before this finished (refused with ${status})`);
+      }
+      for (const name of ['two.txt', 'three.txt']) {
+        await expect(page.locator('#tray-list .lt-up', { hasText: name }).locator('.lt-up-status')).toContainText(
+          status === 401 ? 'Not sent: this device is no longer signed in' : 'The room ended before this finished',
+        );
+      }
+      // A stop that cannot succeed by retrying never offers Retry.
+      await expect(page.locator('#tray-list').getByRole('button', { name: /^Retry / })).toHaveCount(0);
       expect(calls).toBe(1);
     });
   }

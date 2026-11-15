@@ -10,7 +10,7 @@ test.describe('recent activity', () => {
 
     const row = page.locator('#file-list .file-row', { hasText: 'logged.txt' });
     await Promise.all([page.waitForEvent('download'), row.locator('a[download]').click()]);
-    await expect(page.locator('#activity-list')).toContainText('Downloaded to device');
+    await expect(page.locator('#activity-list')).toContainText('Download started: logged.txt');
 
     await page.locator('#btn-clear-activity').click();
     await expect(page.locator('#activity-list')).toContainText('No transfer activity yet');

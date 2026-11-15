@@ -12,11 +12,11 @@ test.describe('close', () => {
     await page.locator('#close-room-btn').click();
     await expect(page.locator('#modal-close-confirm')).toBeVisible();
     await page.locator('#confirm-close-btn').click();
-    await expect(page.locator('#inactive-title')).toHaveText('Room Closed');
+    await expect(page.locator('#inactive-title')).toHaveText('You closed this room');
     await expect(page.locator('#room-active-card')).toBeHidden();
 
     await expect(phone.locator('#room-inactive-card')).toBeVisible({ timeout: 12_000 });
-    await expect(phone.locator('#inactive-title')).toHaveText(/Room (Closed|Inactive)/);
+    await expect(phone.locator('#inactive-title')).toHaveText(/This room (was closed by its creator|has ended)/);
     await phone.close();
   });
 

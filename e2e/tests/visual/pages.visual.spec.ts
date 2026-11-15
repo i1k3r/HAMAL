@@ -69,6 +69,16 @@ test.describe('visual baselines', () => {
     await expect(page).toHaveScreenshot('home.png', { fullPage: true });
   });
 
+  test('home, invalid PIN', async ({ page }) => {
+    await page.goto(`${PRIMARY_URL}/`);
+    await page.evaluate(() => document.fonts.ready);
+    await page.locator('#pin-input').fill('12');
+    await page.locator('#create-submit-btn').click();
+    await expect(page.locator('#form-error')).toBeVisible();
+    await page.locator('#pin-input').blur();
+    await expect(page).toHaveScreenshot('home-invalid-pin.png', { fullPage: true });
+  });
+
   test('creator, files tab', async ({ page }) => {
     const room = await createRoom();
     await mockRoomApi(page, { creator: true });
@@ -77,13 +87,17 @@ test.describe('visual baselines', () => {
     await expect(page).toHaveScreenshot('creator-files.png', { fullPage: true, mask: masks(page) });
   });
 
-  test('creator, text tab', async ({ page }) => {
+  test('creator, writing a note', async ({ page }) => {
+    // The Light Table pages have no separate Text tab: notes lie on the table with the files, and
+    // "Write a note" opens the composer (inline on desktop, a bottom sheet on phones).
     const room = await createRoom();
     await mockRoomApi(page, { creator: true });
     await page.goto(`${room.base}/c/${room.creator_token}`);
     await settle(page);
-    await page.locator('#tab-text').click();
-    await expect(page).toHaveScreenshot('creator-text.png', { fullPage: true, mask: masks(page) });
+    await page.locator('#write-note-btn').click();
+    await expect(page.locator('#composer')).toBeVisible();
+    await page.locator('#text-input').blur();
+    await expect(page).toHaveScreenshot('creator-note.png', { fullPage: true, mask: masks(page) });
   });
 
   test('participant, files tab', async ({ page }) => {
@@ -115,7 +129,25 @@ test.describe('visual baselines', () => {
     await page.evaluate(() => document.fonts.ready);
     await expect(page).toHaveScreenshot('share.png', {
       fullPage: true,
-      mask: [page.locator('#countdown'), page.locator('a[href*="/s/"]')],
+      // Only the clock-dependent parts; the Download button must stay visible to the comparison.
+      mask: [page.locator('#countdown'), page.locator('#share-expires-at')],
     });
   });
+
+  test('share page, link no longer works', async ({ page }) => {
+    const room = await createRoom({ base: LIMITED_URL });
+    const file = await mustUpload(room, 'handout.pdf', 'x'.repeat(2048));
+    const res = await fetch(`${room.base}/api/v1/rooms/${room.creator_token}/files/${file.file_id}/share`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ttl_seconds: 3600 }),
+    });
+    const share = await res.json();
+    await fetch(`${room.base}/api/v1/rooms/${room.creator_token}/close`, { method: 'POST' });
+    const page410 = await page.goto(share.share_url);
+    expect(page410?.status()).toBe(410);
+    await page.evaluate(() => document.fonts.ready);
+    await expect(page).toHaveScreenshot('share-gone.png', { fullPage: true });
+  });
 });
+

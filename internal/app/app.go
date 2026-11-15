@@ -1691,21 +1691,26 @@ func (a *App) routes() (http.Handler, error) {
 		token := r.PathValue("token")
 		sh, f, err := a.shares.GetByToken(r.Context(), token)
 		if err != nil {
-			if errors.Is(err, share.ErrShareNotFound) || errors.Is(err, share.ErrInvalidToken) {
-				http.NotFound(w, r)
-				return
-			}
-			if errors.Is(err, share.ErrShareExpired) || errors.Is(err, share.ErrShareRevoked) || errors.Is(err, share.ErrRoomInactive) {
-				w.WriteHeader(http.StatusGone)
+			// Unknown links answer 404 and dead links 410, as before; both now render the share page's
+			// own explanation instead of a bare error. Nothing about the file is disclosed.
+			missing := errors.Is(err, share.ErrShareNotFound) || errors.Is(err, share.ErrInvalidToken)
+			gone := errors.Is(err, share.ErrShareExpired) || errors.Is(err, share.ErrShareRevoked) || errors.Is(err, share.ErrRoomInactive)
+			if missing || gone {
+				status := http.StatusGone
+				if missing {
+					status = http.StatusNotFound
+				}
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.WriteHeader(status)
 				_ = tmpl.ExecuteTemplate(w, "share.html", map[string]any{
 					"Year":             time.Now().Year(),
-					"ShareToken":       token,
+					"ShareToken":       "",
 					"ExpiresAtRFC3339": "",
 					"Filename":         "",
 					"FormattedSize":    "",
 					"ContentType":      "",
 					"Inactive":         true,
+					"Missing":          missing,
 				})
 				return
 			}

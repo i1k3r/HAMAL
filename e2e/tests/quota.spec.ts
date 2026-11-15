@@ -12,7 +12,7 @@ test.describe('quotas', () => {
       mimeType: 'application/octet-stream',
       buffer: Buffer.alloc(1024 * 1024 + 1),
     });
-    await expect(page.locator('#upload-error')).toContainText('too-big.bin:', { timeout: 12_000 });
+    await expect(page.locator('#tray-list .lt-up', { hasText: 'too-big.bin' }).locator('.lt-up-status')).toContainText('Not sent: ', { timeout: 12_000 });
     await expect(page.locator('#file-list .file-row')).toHaveCount(0);
   });
 
@@ -28,7 +28,7 @@ test.describe('quotas', () => {
       mimeType: 'application/octet-stream',
       buffer: Buffer.alloc(200 * 1024),
     });
-    await expect(page.locator('#upload-error')).toContainText('overflow.bin:', { timeout: 12_000 });
+    await expect(page.locator('#tray-list .lt-up', { hasText: 'overflow.bin' }).locator('.lt-up-status')).toContainText('Not sent: ', { timeout: 12_000 });
     await expect(page.locator('#file-list .file-row')).toHaveCount(3);
   });
 
@@ -38,7 +38,7 @@ test.describe('quotas', () => {
     await page.goto(`${room.base}/r/${room.participant_token}`);
     await expect(page.locator('#file-list .file-row')).toHaveCount(5);
     await page.locator('#file-input').setInputFiles({ name: 'sixth.txt', mimeType: 'text/plain', buffer: Buffer.from('6') });
-    await expect(page.locator('#upload-error')).toContainText('sixth.txt:', { timeout: 12_000 });
+    await expect(page.locator('#tray-list .lt-up', { hasText: 'sixth.txt' }).locator('.lt-up-status')).toContainText('Not sent: ', { timeout: 12_000 });
     await expect(page.locator('#file-list .file-row')).toHaveCount(5);
   });
 });

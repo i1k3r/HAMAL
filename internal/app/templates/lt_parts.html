@@ -1,0 +1,198 @@
+{{/*
+  Light Table room page parts, shared by creator.html and participant.html.
+  The client side (room.js) renders items into #file-list / #list-body; the templates provide the
+  page shell so the room is legible before the script loads.
+*/}}
+
+{{define "lt-head"}}
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#1A0D0B">
+  <link rel="icon" type="image/svg+xml" href="/static/brand/hamal-app-icon.svg">
+  <link rel="alternate icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/static/brand/hamal-app-icon.svg">
+  <link rel="stylesheet" href="/static/fonts/fonts.css">
+  <link rel="stylesheet" href="/static/lighttable.css">
+  <script>
+    (function () {
+      var theme = 'dark';
+      try { theme = localStorage.getItem('hamal_theme') || 'dark'; } catch (e) {}
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+  <script defer src="/static/site.js"></script>
+  <script defer src="/static/room.js"></script>
+{{end}}
+
+{{define "lt-lamp"}}
+      <div class="lt-lamp" id="lamp">
+        <svg class="lt-lamp-bulb" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6"></path><path d="M10 21h4"></path><path d="M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.6 1 2.5h6c0-.9.2-1.7 1-2.5A6 6 0 0 0 12 3z"></path></svg>
+        <div class="lt-lamp-body">
+          <span class="lt-lamp-text"><span id="lamp-label">Lamp on,</span> <span id="countdown">…</span> <span id="lamp-left">left</span></span>
+          <div class="lt-lamp-track" id="lamp-meter" role="meter" aria-label="Time left in this room" aria-valuemin="0" aria-valuemax="3600" aria-valuenow="3600">
+            <div class="lt-lamp-fill" id="lamp-fill"></div>
+          </div>
+        </div>
+      </div>
+{{end}}
+
+{{define "lt-theme"}}
+      <div class="lt-theme" role="group" aria-label="Theme">
+        <button type="button" id="theme-btn-light" title="Light frame" aria-label="Light theme">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="4.22" x2="19.78" y2="5.64"></line></svg>
+        </button>
+        <button type="button" id="theme-btn-dark" class="active" title="Dark frame" aria-label="Dark theme">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </button>
+      </div>
+{{end}}
+
+{{define "lt-toolbar"}}
+    <div class="lt-toolbar" id="toolbar">
+      <div class="lt-search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <label for="search-input" class="lt-sr">Find a file or note</label>
+        <input type="search" id="search-input" placeholder="Find a file or note" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="lt-chips" id="kind-chips" role="group" aria-label="Show">
+        <button type="button" class="lt-chip" data-kind="all" aria-pressed="true">All <span class="lt-chip-count" id="count-all">0</span></button>
+        <button type="button" class="lt-chip" data-kind="image" aria-pressed="false">Images <span class="lt-chip-count" id="count-image">0</span></button>
+        <button type="button" class="lt-chip" data-kind="video" aria-pressed="false">Video <span class="lt-chip-count" id="count-video">0</span></button>
+        <button type="button" class="lt-chip" data-kind="audio" aria-pressed="false">Audio <span class="lt-chip-count" id="count-audio">0</span></button>
+        <button type="button" class="lt-chip" data-kind="document" aria-pressed="false">Documents <span class="lt-chip-count" id="count-document">0</span></button>
+        <button type="button" class="lt-chip" data-kind="archive" aria-pressed="false">Archives <span class="lt-chip-count" id="count-archive">0</span></button>
+        <button type="button" class="lt-chip" data-kind="note" aria-pressed="false">Notes <span class="lt-chip-count" id="text-count">0</span></button>
+        <button type="button" class="lt-chip" data-kind="other" aria-pressed="false">Other <span class="lt-chip-count" id="count-other">0</span></button>
+      </div>
+      <label for="kind-select" class="lt-sr">Show</label>
+      <select id="kind-select" class="lt-kind-select">
+        <option value="all">Everything</option>
+        <option value="image">Images</option>
+        <option value="video">Video</option>
+        <option value="audio">Audio</option>
+        <option value="document">Documents</option>
+        <option value="archive">Archives</option>
+        <option value="note">Notes</option>
+        <option value="other">Other</option>
+      </select>
+      <span class="lt-spacer"></span>
+      <label for="sort-select" class="lt-sr">Sort</label>
+      <select id="sort-select" class="lt-sort">
+        <option value="newest">Newest first</option>
+        <option value="name">Name A–Z</option>
+        <option value="size">Largest first</option>
+      </select>
+      <div class="lt-viewswitch" role="group" aria-label="View">
+        <button type="button" id="view-table" aria-pressed="true">Table</button>
+        <button type="button" id="view-list" aria-pressed="false">List</button>
+      </div>
+    </div>
+{{end}}
+
+{{define "lt-tabletop"}}
+      <h1 class="lt-sr" id="table-heading" tabindex="-1">Room open</h1>
+      <div class="lt-list-bar" id="list-bar" hidden>
+        <label class="lt-selall"><input type="checkbox" id="select-all"> <span>Select all files</span></label>
+        <button type="button" class="lt-ink-btn" id="save-selected-btn" disabled>Save selected (0)</button>
+        <span id="bulk-note" hidden>If some files didn't download, your browser may have blocked multiple downloads. Allow them for this site, or save files one at a time.</span>
+      </div>
+      <div class="lt-list-head" id="list-head" hidden aria-hidden="true">
+        <span></span><span>Name</span><span>Kind</span><span>Size</span><span>Added</span><span></span>
+      </div>
+      <ul class="lt-grid" id="file-list" aria-label="Files and notes, newest first">{{range .Files}}
+        <li class="lt-item file-row" data-ssr="1"><article class="lt-slip"><span class="lt-slip-hole" aria-hidden="true"></span><div class="lt-item-foot"><div class="lt-item-names"><h3 class="lt-item-name" title="{{.OriginalFilename}}">{{.OriginalFilename}}</h3><span class="lt-item-meta">{{.SizeBytes}} B</span></div><div class="lt-actions"><a class="lt-ink-btn btn-download" href="/api/v1/rooms/{{if $.CreatorToken}}{{$.CreatorToken}}{{else}}{{$.ParticipantToken}}{{end}}/files/{{.ID}}" download="{{.OriginalFilename}}">Save</a></div></div></article></li>{{end}}
+      </ul>
+      <p class="lt-no-match" id="no-match" hidden>Nothing on the table matches.</p>
+{{end}}
+
+{{define "lt-composer"}}
+    <div class="lt-composer-backdrop" id="composer-backdrop" hidden></div>
+    <section class="lt-composer" id="composer" aria-label="Write a note" hidden>
+      <div class="lt-composer-card">
+        <label for="text-input" class="lt-sr">Note</label>
+        <textarea id="text-input" rows="3" placeholder="Type or paste a note, a command, a link…" spellcheck="false"></textarea>
+      </div>
+      <div class="lt-overlimit" id="text-overlimit" hidden>
+        <span id="text-overlimit-msg"></span>
+        <button type="button" class="lt-ink-btn" id="send-as-file-btn">Send as .txt file</button>
+      </div>
+      <div class="lt-compose-error" id="text-compose-error" role="alert" hidden></div>
+      <div class="lt-composer-row">
+        <span class="lt-counter" id="text-size-counter">0 B of 64 KB</span>
+        <span class="lt-hint" id="composer-hint">Ctrl+Enter sends. Long-press to paste.</span>
+        <span class="lt-spacer"></span>
+        <button type="button" class="lt-btn lt-btn-quiet" id="composer-cancel">Close</button>
+        <button type="button" class="lt-btn lt-btn-primary" id="send-text-btn"><span id="send-text-label">Send note</span></button>
+      </div>
+    </section>
+{{end}}
+
+{{define "lt-dock"}}
+    <footer class="lt-dock" id="dock">
+      <button type="button" class="lt-btn lt-btn-primary lt-btn-lg" id="add-files-btn">Add files</button>
+      <button type="button" class="lt-btn lt-btn-outline lt-btn-lg" id="write-note-btn" aria-expanded="false" aria-controls="composer">Write a note</button>
+      <span class="lt-hint" id="dock-hint">Drop files anywhere on the table. Ctrl+V lays down a copied image.</span>
+      <span class="lt-spacer lt-dock-spacer"></span>
+      <input type="file" id="file-input" multiple hidden>
+    </footer>
+{{end}}
+
+{{define "lt-shared-overlays"}}
+  <aside class="lt-tray" id="upload-tray" aria-label="Uploads" hidden>
+    <div class="lt-tray-head">
+      <span class="lt-tray-summary" id="tray-summary"></span>
+      <button type="button" class="lt-tray-toggle" id="tray-toggle" aria-expanded="true" aria-controls="tray-list">Hide</button>
+    </div>
+    <ul class="lt-tray-list" id="tray-list"></ul>
+  </aside>
+
+  <!-- Media viewer. Keeps the preview ids from 6765e5e (#file-preview-overlay, #preview-body,
+       #preview-filename, #preview-close-btn); Escape, the close button and the backdrop close it. -->
+  <div id="file-preview-overlay" class="lt-viewer hidden" role="dialog" aria-modal="true" aria-labelledby="preview-filename">
+    <div class="lt-viewer-head">
+      <span class="lt-viewer-count" id="viewer-count"></span>
+      <h2 class="lt-viewer-title" id="preview-filename"></h2>
+      <button type="button" class="lt-viewer-close" id="preview-close-btn" aria-label="Close viewer" title="Close (Esc)">✕</button>
+    </div>
+    <div class="lt-viewer-body" id="preview-body"></div>
+    <div class="lt-viewer-note" id="viewer-note" role="status"></div>
+    <div class="lt-viewer-foot">
+      <button type="button" class="lt-btn lt-btn-quiet" id="viewer-prev">Previous</button>
+      <button type="button" class="lt-btn lt-btn-primary" id="viewer-save">Save</button>
+      <button type="button" class="lt-btn lt-btn-quiet" id="viewer-next">Next</button>
+    </div>
+  </div>
+
+  <div class="lt-overlay" id="shortcuts-dialog" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" hidden>
+    <div class="lt-sheet">
+      <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+      <dl class="lt-kbd-list">
+        {{if .CreatorToken}}<dt><kbd>Q</kbd></dt><dd>Show the QR code</dd>{{end}}
+        <dt><kbd>/</kbd></dt><dd>Find a file or note</dd>
+        <dt><kbd>N</kbd></dt><dd>Write a note</dd>
+        <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Previous and next in the viewer</dd>
+        <dt><kbd>Esc</kbd></dt><dd>Close a dialog</dd>
+        <dt><kbd>?</kbd></dt><dd>This list</dd>
+      </dl>
+      <div class="lt-sheet-actions"><span class="lt-version font-mono" style="margin-inline-end:auto;color:var(--ink-muted);font-size:13px">HAMAL v0.8.14</span><button type="button" class="lt-btn lt-btn-primary" id="shortcuts-close">Done</button></div>
+    </div>
+  </div>
+
+  <div class="lt-sr" id="live-polite" aria-live="polite"></div>
+  <div class="lt-sr" id="live-assertive" aria-live="assertive"></div>
+{{end}}
+
+{{define "lt-end"}}
+  <section class="lt-gate lt-end-card" id="room-inactive-card" {{if not .Inactive}}hidden{{end}}>
+    <header class="lt-top"><a class="lt-wordmark" href="/">hamal</a></header>
+    <div class="lt-gate-stage">
+      <div class="lt-gate-card">
+        <h1 id="inactive-title" tabindex="-1">This room has ended</h1>
+        <p id="inactive-message">Files and notes on it were deleted. Anything you already saved is still on this device.</p>
+        <p id="inactive-downloads" hidden>Downloads already in progress may still finish in your browser.</p>
+        {{if .CreatorToken}}<div><a class="lt-btn lt-btn-primary" href="/">Start a new room</a></div>{{end}}
+      </div>
+    </div>
+  </section>
+{{end}}

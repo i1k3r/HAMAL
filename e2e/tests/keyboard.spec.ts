@@ -1,4 +1,4 @@
-import { test, expect, knownFailure } from './support/fixtures';
+import { test, expect } from './support/fixtures';
 import { createRoom } from './support/api';
 
 /** Presses Tab up to `max` times and returns a description of every element that got focus. */
@@ -35,11 +35,10 @@ test.describe('keyboard access', () => {
     const stops = await tabStops(page);
     expect(stops.length, 'setup: Tab moves focus through the page').toBeGreaterThan(5);
 
-    await knownFailure('KF-006', async () => {
-      const reachable = stops.some(
-        (s) => s.includes('#dropzone') || s.includes('[in-dropzone]') || s.includes('#file-input'),
-      );
-      expect(reachable, "KF-006: the creator's upload area is reachable with Tab").toBe(true);
-    });
+    // Formerly KF-006.
+    const reachable = stops.some(
+      (s) => s.includes('#dropzone') || s.includes('[in-dropzone]') || s.includes('#file-input'),
+    );
+    expect(reachable, "the creator's upload area is reachable with Tab").toBe(true);
   });
 });

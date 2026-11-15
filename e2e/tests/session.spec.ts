@@ -11,10 +11,10 @@ test.describe('session identity', () => {
       }
     });
     await page.goto(`${room.base}/r/${room.participant_token}`);
-    await page.locator('#tab-text').click();
+    await page.locator('#write-note-btn').click();
     await page.locator('#text-input').fill('mine');
     await page.locator('#send-text-btn').click();
-    const mine = page.locator('#text-list .text-item-card', { hasText: 'mine' });
+    const mine = page.locator('#file-list .text-item-card', { hasText: 'mine' });
     await expect(mine).toHaveClass(/client-self/);
 
     const stored = await page.evaluate((t) => sessionStorage.getItem(`hamal_client_session_${t}`), room.participant_token);
@@ -23,7 +23,7 @@ test.describe('session identity', () => {
     expect(new Set(headers)).toEqual(new Set([stored]));
 
     await page.reload();
-    await page.locator('#tab-text').click();
-    await expect(page.locator('#text-list .text-item-card', { hasText: 'mine' })).toHaveClass(/client-self/);
+    await page.locator('#write-note-btn').click();
+    await expect(page.locator('#file-list .text-item-card', { hasText: 'mine' })).toHaveClass(/client-self/);
   });
 });

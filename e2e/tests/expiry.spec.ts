@@ -13,7 +13,7 @@ test.describe('expiry', () => {
     expect(await countdown.textContent()).not.toBe(first);
 
     await expect(page.locator('#room-inactive-card')).toBeVisible({ timeout: 75_000 });
-    await expect(page.locator('#inactive-title')).toHaveText(/Room (Expired|Inactive|Closed)/);
+    await expect(page.locator('#inactive-title')).toHaveText('This room has ended');
 
     let apiCalls = 0;
     page.on('request', (r) => {
