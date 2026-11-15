@@ -36,7 +36,7 @@ HAMAL is built around short-lived transfer rooms rather than permanent storage. 
 
 ## Screenshots
 
-HAMAL uses the **Light Table** design throughout, from opening a room to joining one: a darkroom frame around a lit table, where photos lie as prints, documents and audio as manila slips, and notes as index cards. The lamp at the top shows how long the room has left. Screens below are captured from the running application with demo data.
+HAMAL uses the **Light Table** design throughout, from opening a room to joining one and opening a public share link: a darkroom frame around a lit table, where photos lie as prints, documents and audio as manila slips, and notes as index cards. The lamp at the top shows how long the room has left. Screens below are captured from the running application with demo data.
 
 <div align="center">
 
@@ -64,6 +64,12 @@ HAMAL uses the **Light Table** design throughout, from opening a room to joining
 ### List view and media viewer
 <img src="docs/screenshots/list-desktop.jpg" alt="HAMAL List view: the same files and notes as rows with Select all and Save selected" width="440" />
 <img src="docs/screenshots/viewer-desktop.jpg" alt="HAMAL media viewer showing a photo with Previous, Save and Next" width="440" />
+
+<br/><br/>
+
+### Public share link — desktop and phone
+<img src="docs/screenshots/share-desktop.jpg" alt="HAMAL public share page: the shared file as a slip with its type, name and size, a Download button and the time the link stops working" width="640" />
+<img src="docs/screenshots/share-phone.jpg" alt="HAMAL public share page on a phone" width="250" />
 
 <br/><br/>
 

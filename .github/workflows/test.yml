@@ -184,20 +184,11 @@ jobs:
         working-directory: e2e
         run: |
           if [ "${{ steps.baselines.outputs.mode }}" = "update" ]; then
-            npx playwright test --project=visual-desktop --project=visual-phone --update-snapshots=all --retries=0 --workers=1
+            npx playwright test --project=visual-desktop --project=visual-phone --update-snapshots --retries=0 --workers=1
           else
             npx playwright test --project=visual-desktop --project=visual-phone --retries=0 --workers=1
           fi
 
-      - name: TEMPORARY dump baselines to log (removed in the next commit)
-        if: steps.baselines.outputs.mode == 'update'
-        working-directory: e2e/tests/visual/__screenshots__
-        run: |
-          for f in */*/*.png; do
-            echo "=====BEGIN $f $(sha256sum "$f" | cut -c1-64)"
-            base64 -w 2000 "$f"
-            echo "=====END $f"
-          done
       - name: Upload baselines
         if: steps.baselines.outputs.mode == 'update'
         uses: actions/upload-artifact@v4
