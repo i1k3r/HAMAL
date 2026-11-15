@@ -195,7 +195,7 @@ jobs:
         run: |
           for f in */*/*.png; do
             echo "=====BEGIN $f $(sha256sum "$f" | cut -c1-64)"
-            base64 -w 0 "$f"; echo
+            base64 -w 2000 "$f"
             echo "=====END $f"
           done
       - name: Upload baselines
