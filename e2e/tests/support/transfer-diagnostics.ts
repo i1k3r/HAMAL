@@ -32,6 +32,9 @@ const TEXTS = /\/api\/v1\/rooms\/[^/]+\/texts$/;
 type Watched = { label: string; page: Page; samplers: Array<{ name: string; selector: string; last: number }> };
 
 export class TransferDiagnostics {
+  /** `tag` is printed in the report header, for example the experiment variant. */
+  constructor(private readonly tag = '') {}
+
   private readonly t0 = Date.now();
   private readonly events: Event[] = [];
   private readonly started = new Map<Request, number>();
@@ -179,7 +182,8 @@ export class TransferDiagnostics {
     const lines = this.events
       .sort((a, b) => a.t - b.t)
       .map((e) => `${String(e.t).padStart(6)} ms  ${e.page.padEnd(8)} ${e.kind.padEnd(16)} ${e.detail}`);
-    const text = [`Transfer diagnostics for "${testInfo.title}" [${testInfo.project.name}]`, ...lines].join('\n');
+    const header = `Transfer diagnostics for "${testInfo.title}" [${testInfo.project.name}]${this.tag ? ` ${this.tag}` : ''}`;
+    const text = [header, ...lines].join('\n');
     console.log(text);
     await testInfo.attach('transfer-diagnostics.txt', { body: text, contentType: 'text/plain' });
   }

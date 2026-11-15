@@ -8,15 +8,39 @@ async function serverFiles(room: { base: string; participant_token: string }): P
   return (r.json.files ?? []).map((f: any) => f.filename).sort();
 }
 
+/*
+ * Upload instrumentation experiment for the intermittent WebKit "uploaded file is empty" failure
+ * of the multi-file picker test. Two independent switches, read from the environment:
+ *   HAMAL_UPLOAD_PROBE=on|off        in-page File probe (reads each File with arrayBuffer()).
+ *                                    "off" installs nothing in the page.
+ *   HAMAL_UPLOAD_DIAG_SERVER=on|off  "on" creates the room on the diagnostic server
+ *                                    (e2e/diagserver, 127.0.0.1:7801), which records what it
+ *                                    receives; "off" uses the normal primary server (7799).
+ * Variants: A = off/off (the original scenario, and the default), B = probe off / server on,
+ * C = probe on / server off, D = on/on. Results from different variants must not be combined.
+ */
+function onOff(name: string): boolean {
+  const v = process.env[name] ?? 'off';
+  if (v !== 'on' && v !== 'off') throw new Error(`${name} must be "on" or "off", got "${v}"`);
+  return v === 'on';
+}
+const UPLOAD_PROBE = onOff('HAMAL_UPLOAD_PROBE');
+const UPLOAD_DIAG_SERVER = onOff('HAMAL_UPLOAD_DIAG_SERVER');
+const UPLOAD_VARIANT = ({ 'off/off': 'A', 'off/on': 'B', 'on/off': 'C', 'on/on': 'D' } as const)[
+  `${UPLOAD_PROBE ? 'on' : 'off'}/${UPLOAD_DIAG_SERVER ? 'on' : 'off'}` as 'off/off'
+];
+const UPLOAD_VARIANT_LABEL = `upload-variant=${UPLOAD_VARIANT} probe=${UPLOAD_PROBE ? 'on' : 'off'} diag-server=${UPLOAD_DIAG_SERVER ? 'on' : 'off'}`;
+
 test.describe('upload', () => {
   test('several files can be chosen with the picker @responsive', async ({ page }, testInfo) => {
     // Diagnostics for an intermittent WebKit failure (CI runs 43640379399, 43641965031,
     // 43641969624, 43643272986, 43643277150: one of the three uploads gets HTTP 400 "uploaded
-    // file is empty"); printed only on failure. The room lives on the diagnostic server, which
-    // runs the same handler and records what it receives for each upload.
-    const diag = new TransferDiagnostics();
-    await diag.watch(page, 'page', { 'file rows': '#file-list .file-row' }, { probeFiles: true });
-    const room = await createRoom({ base: DIAG_URL });
+    // file is empty"); printed only on failure. Instrumentation is chosen by the experiment
+    // switches above.
+    testInfo.annotations.push({ type: 'upload-variant', description: UPLOAD_VARIANT_LABEL });
+    const diag = new TransferDiagnostics(UPLOAD_VARIANT_LABEL);
+    await diag.watch(page, 'page', { 'file rows': '#file-list .file-row' }, { probeFiles: UPLOAD_PROBE });
+    const room = UPLOAD_DIAG_SERVER ? await createRoom({ base: DIAG_URL }) : await createRoom();
     let failed = true;
     try {
       await page.goto(`${room.base}/r/${room.participant_token}`);
@@ -32,7 +56,9 @@ test.describe('upload', () => {
       await diag.report(
         testInfo,
         failed,
-        async () => `files on server: [${(await serverFiles(room)).join(', ')}]\n${serverUploads(room.participant_token)}`,
+        async () =>
+          `files on server: [${(await serverFiles(room)).join(', ')}]\n` +
+          (UPLOAD_DIAG_SERVER ? serverUploads(room.participant_token) : 'diagnostic server not used in this variant'),
       );
     }
   });
