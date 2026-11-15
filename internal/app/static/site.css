@@ -353,12 +353,6 @@ svg {
   padding: 2px;
 }
 
-.sidebar-version-tag {
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-}
-
 .sidebar-settings-btn {
   background: transparent;
   border: none;
