@@ -36,9 +36,15 @@ HAMAL is built around short-lived transfer rooms rather than permanent storage. 
 
 ## Screenshots
 
-Room pages use the **Light Table** design: a darkroom frame around a lit table, where photos lie as prints, documents and audio as manila slips, and notes as index cards. The lamp at the top shows how long the room has left. Screens below are captured from the running application with demo data.
+HAMAL uses the **Light Table** design throughout, from opening a room to joining one: a darkroom frame around a lit table, where photos lie as prints, documents and audio as manila slips, and notes as index cards. The lamp at the top shows how long the room has left. Screens below are captured from the running application with demo data.
 
 <div align="center">
+
+### Open a room — desktop and phone
+<img src="docs/screenshots/home-desktop.jpg" alt="HAMAL home page: Open a room, with how long the room stays open, an optional PIN and the Open the room button" width="640" />
+<img src="docs/screenshots/home-phone.jpg" alt="HAMAL home page on a phone with the room form in the first screen" width="250" />
+
+<br/><br/>
 
 ### Room — creator, desktop
 <img src="docs/screenshots/creator-desktop.jpg" alt="HAMAL creator view: files and notes on the lit table, lamp gauge, device chip, Show QR and Close room" width="900" />
@@ -65,11 +71,6 @@ Room pages use the **Light Table** design: a darkroom frame around a lit table, 
 <img src="docs/screenshots/pin-phone.jpg" alt="HAMAL PIN screen on a phone" width="250" />
 <img src="docs/screenshots/participant-phone.jpg" alt="HAMAL participant view on a phone with Add files and Write a note" width="250" />
 <img src="docs/screenshots/closing-phone.jpg" alt="HAMAL phone view in the last two minutes: warning banner and dimmed table" width="250" />
-
-<br/><br/>
-
-### Home — create a room
-<img src="docs/screenshots/home-desktop.jpg" alt="HAMAL home page with the Create Transfer Room form" width="900" />
 
 </div>
 
