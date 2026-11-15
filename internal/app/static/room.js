@@ -1322,7 +1322,7 @@
     if (fill) fill.style.width = `${state.ttl ? Math.max(0, Math.min(100, (sec / state.ttl) * 100)) : 100}%`;
     $('lamp')?.classList.toggle('is-late', sec <= 300);
     frame?.classList.toggle('is-dusk', sec <= 120);
-    if ($('lamp-label')) $('lamp-label').textContent = sec <= 120 ? 'Lamp off in' : 'Lamp on';
+    if ($('lamp-label')) $('lamp-label').textContent = sec <= 120 ? 'Lamp off in' : 'Lamp on,';
     if ($('lamp-left')) $('lamp-left').textContent = sec <= 120 ? '' : 'left';
     if ($('qr-lamp')) $('qr-lamp').textContent = `Lamp on, ${lampWords(sec)} left`;
     const closingCard = $('room-closing-card');

@@ -141,6 +141,7 @@ test.describe('Light Table', () => {
     await expect(banner).toContainText('Save anything you need now.');
     await expect(page.locator('[role="alert"]:visible')).toHaveCount(1);
     await expect(page.locator('#lamp')).toHaveClass(/is-late/);
+    await expect(page.locator('.lt-lamp-text')).toHaveText(/^Lamp off in \d\d:\d\d\s*$/);
   });
 
   test('no horizontal scroll at 320 px with a very long file name @responsive', async ({ page }) => {
@@ -181,5 +182,14 @@ test.describe('Light Table', () => {
     await expect(media.locator('img')).toHaveCount(0);
     // The file itself is still listed with its actions.
     await expect(page.getByRole('button', { name: 'View gone.jpg' })).toBeVisible();
+  });
+
+  test('text typed into a note is dark ink on the white card', async ({ page }) => {
+    const room = await createRoom();
+    await page.goto(`${room.base}/c/${room.creator_token}`);
+    await page.locator('#write-note-btn').click();
+    await page.locator('#text-input').fill('docker compose up -d');
+    const color = await page.locator('#text-input').evaluate((n) => getComputedStyle(n).color);
+    expect(color).toBe('rgb(31, 27, 25)');
   });
 });
