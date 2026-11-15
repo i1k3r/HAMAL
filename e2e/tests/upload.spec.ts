@@ -2,6 +2,9 @@ import { test, expect } from './support/fixtures';
 import { createRoom, getJSON, DIAG_URL } from './support/api';
 import { dropFiles, pasteImage } from './support/page';
 import { TransferDiagnostics, serverUploads } from './support/transfer-diagnostics';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 async function serverFiles(room: { base: string; participant_token: string }): Promise<string[]> {
   const r = await getJSON(`${room.base}/api/v1/rooms/${room.participant_token}/files`);
@@ -60,6 +63,44 @@ test.describe('upload', () => {
           `files on server: [${(await serverFiles(room)).join(', ')}]\n` +
           (UPLOAD_DIAG_SERVER ? serverUploads(room.participant_token) : 'diagnostic server not used in this variant'),
       );
+    }
+  });
+
+  // Experiment E (temporary): the same picker scenario with disk-backed files instead of
+  // Playwright's in-memory buffers, to tell whether the WebKit "uploaded file is empty" failure
+  // depends on in-memory files. Runs only when HAMAL_UPLOAD_DISK_EXPERIMENT=on; no in-page probe,
+  // normal server. The in-memory test above is unchanged and remains the control.
+  test('several files can be chosen with the picker from disk (experiment E) @responsive', async ({ page }, testInfo) => {
+    test.skip(
+      process.env.HAMAL_UPLOAD_DISK_EXPERIMENT !== 'on',
+      'experiment E runs only when HAMAL_UPLOAD_DISK_EXPERIMENT=on',
+    );
+    const label = 'upload-variant=E files=disk probe=off diag-server=off';
+    testInfo.annotations.push({ type: 'upload-variant', description: label });
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hamal-upload-e-'));
+    try {
+      const files = { 'alpha.txt': 'alpha', 'beta.txt': 'beta', 'gamma.txt': 'gamma' };
+      for (const [name, content] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), content);
+
+      const diag = new TransferDiagnostics(label);
+      await diag.watch(page, 'page', { 'file rows': '#file-list .file-row' }, { probeFiles: false });
+      const room = await createRoom();
+      let failed = true;
+      try {
+        await page.goto(`${room.base}/r/${room.participant_token}`);
+        await page.locator('#file-input').setInputFiles(Object.keys(files).map((name) => path.join(dir, name)));
+        await expect(page.locator('#file-list .file-row')).toHaveCount(3, { timeout: 12_000 });
+        expect(await serverFiles(room)).toEqual(['alpha.txt', 'beta.txt', 'gamma.txt']);
+        failed = false;
+      } finally {
+        await diag.report(
+          testInfo,
+          failed,
+          async () => `files on server: [${(await serverFiles(room)).join(', ')}]\ndiagnostic server not used in this variant`,
+        );
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 
