@@ -11,7 +11,23 @@
   <TemplateURL>https://raw.githubusercontent.com/i1k3r/HAMAL/main/unraid-template.xml</TemplateURL>
   <ReadMe>https://github.com/i1k3r/HAMAL#readme</ReadMe>
   <Overview>HAMAL is a fast, lightweight, self-hosted file and text sharing server for your local network. Easily transfer files and share text between devices using a web browser — no client installation required. Designed for privacy, simplicity, and seamless LAN-based sharing. All data stays on your own server.</Overview>
-  <Description>HAMAL is a fast, lightweight, self-hosted file and text sharing server for your local network. Easily transfer files and share text between devices using a web browser — no client installation required. Designed for privacy, simplicity, and seamless LAN-based sharing. All data stays on your own server.</Description>
+  <Description>HAMAL is a lightweight, self-hosted file and text sharing server for your local network.
+
+Share files and text between your devices using nothing more than a web browser. No client installation, external cloud storage, or third-party account is required.
+
+FEATURES
+- File transfers: Send files between devices over your LAN.
+- Text sharing: Share notes, commands, logs, URLs, and configuration snippets.
+- QR code pairing: Connect a second device quickly by scanning a room QR code.
+- Temporary rooms: Transfers are organized into rooms with automatic expiration.
+- PIN protection: Optionally protect rooms with a PIN.
+- Self-hosted and private: Your data stays on your own server.
+
+SETUP
+Open the WebUI after installation. Create a room and connect another device on your local network using the displayed QR code or room link.
+
+DATA
+HAMAL stores its database, uploaded files, and server secrets in the configured /data directory. Keep the appdata mapping persistent to retain your data across container updates.</Description>
   <Changes>v0.8.14 - Security and reliability release: upload storage limits are now enforced correctly across concurrent uploads, small API requests are size-limited, only the room creator can close a room, PINs are 4-8 digits, participant details stay hidden until the PIN is entered, the upload queue reports errors and keeps going, shared text keeps its exact formatting, and fonts are bundled so pages make no third-party requests.</Changes>
   <License>HAMAL Source-Available Organizational Use License</License>
   <ExtraSearchTerms>clipboard text transfer temporary sharing LAN file transfer local file transfer QR file transfer temporary clipboard</ExtraSearchTerms>
