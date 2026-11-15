@@ -11,7 +11,15 @@
   <TemplateURL>https://raw.githubusercontent.com/i1k3r/HAMAL/main/unraid-template.xml</TemplateURL>
   <ReadMe>https://github.com/i1k3r/HAMAL#readme</ReadMe>
   <Overview>HAMAL is a self-hosted file and text sharing server for your local network. Transfer files and share text between devices using a browser and QR codes — no client installation or cloud service required.</Overview>
-  <Description>HAMAL makes it easy to move files and text between devices on the same local network. Create a temporary room, scan its QR code, and start sharing from any device with a web browser.\n\n- **File transfers:** Send files directly over your LAN.\n- **Text sharing:** Share notes, commands, logs, URLs, and configuration snippets.\n- **Temporary rooms:** Keep transfers short-lived with automatic room expiration.\n- **Privacy controls:** Optionally protect rooms with a PIN.\n- **Self-hosted:** Your transfers stay on your own server; no third-party cloud storage is required.\n\nHAMAL is lightweight, private, and designed for quick device-to-device sharing.</Description>
+  <Description>HAMAL makes it easy to move files and text between devices on the same local network. Create a temporary room, scan its QR code, and start sharing from any device with a web browser.
+
+- **File transfers:** Send files directly over your LAN.
+- **Text sharing:** Share notes, commands, logs, URLs, and configuration snippets.
+- **Temporary rooms:** Keep transfers short-lived with automatic room expiration.
+- **Privacy controls:** Optionally protect rooms with a PIN.
+- **Self-hosted:** Your transfers stay on your own server; no third-party cloud storage is required.
+
+HAMAL is lightweight, private, and designed for quick device-to-device sharing.</Description>
   <Changes>v0.8.14 - Security and reliability release: upload storage limits are now enforced correctly across concurrent uploads, small API requests are size-limited, only the room creator can close a room, PINs are 4-8 digits, participant details stay hidden until the PIN is entered, the upload queue reports errors and keeps going, shared text keeps its exact formatting, and fonts are bundled so pages make no third-party requests.</Changes>
   <License>HAMAL Source-Available Organizational Use License</License>
   <ExtraSearchTerms>clipboard text transfer temporary sharing LAN file transfer local file transfer QR file transfer temporary clipboard</ExtraSearchTerms>
