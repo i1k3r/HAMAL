@@ -1602,6 +1602,7 @@
     $('modal-file-subtitle').textContent = `Create a temporary public download link for "${filename}".`;
     $('share-result-box').hidden = true;
     $('share-error-box').hidden = true;
+    $('generate-share-btn').classList.replace('lt-btn-quiet', 'lt-btn-primary');
     openModal(shareDlg, opener, $('share-ttl-select'));
   }
   $('close-modal-btn')?.addEventListener('click', () => closeModal(shareDlg));
@@ -1619,6 +1620,8 @@
         const d = await res.json();
         $('generated-share-input').value = d.share_url;
         $('share-result-box').hidden = false;
+        // Once a link exists, copying it is the one primary action of the dialog.
+        $('generate-share-btn').classList.replace('lt-btn-primary', 'lt-btn-quiet');
         $('copy-share-btn').focus();
       } else {
         const d = await res.json().catch(() => ({}));

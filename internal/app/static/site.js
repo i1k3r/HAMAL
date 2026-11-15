@@ -196,6 +196,100 @@
   }
 
   // --------------------------------------------------------------------------
+  // Public share page (/s/{token}): live expiry and a checked download
+  // --------------------------------------------------------------------------
+  if (document.body.dataset.page === 'share' && document.getElementById('share-card')) {
+    const card = document.getElementById('share-card');
+    const expiredCard = document.getElementById('share-expired-card');
+    const expiresAt = Date.parse(document.body.dataset.expires || '');
+    const atEl = document.getElementById('share-expires-at');
+    const cdWrap = document.getElementById('countdown-wrap');
+    const cdEl = document.getElementById('countdown');
+    const dl = document.getElementById('share-download-btn');
+    const dlErr = document.getElementById('share-download-error');
+    const nameEl = document.getElementById('share-title');
+    const extEl = document.getElementById('share-ext');
+
+    // The file type, large on the slip, as on the room's table.
+    if (nameEl && extEl) {
+      const lower = (nameEl.textContent || '').trim().toLowerCase();
+      const multi = ['tar.gz', 'tar.bz2', 'tar.xz', 'tar.zst'].find((m) => lower.endsWith('.' + m));
+      const dot = lower.lastIndexOf('.');
+      const ext = multi || (dot > 0 && dot < lower.length - 1 ? lower.slice(dot + 1) : '');
+      extEl.textContent = (ext || 'file').toUpperCase();
+      // Size and kind in the room's words ("Document, 3 B") instead of a MIME type.
+      const metaEl = document.getElementById('share-meta');
+      if (metaEl) {
+        const last = ext.split('.').pop();
+        const kinds = {
+          Image: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'tiff', 'tif', 'svg', 'ico', 'heic', 'avif'],
+          Video: ['mp4', 'mkv', 'avi', 'mov', 'webm', 'm4v', 'wmv'],
+          Audio: ['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'wma', 'opus'],
+          Document: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf', 'txt', 'md', 'csv', 'json', 'log', 'xml', 'yaml', 'yml', 'conf', 'ini', 'html', 'htm'],
+          Archive: ['zip', '7z', 'rar', 'tar', 'gz', 'tgz', 'bz2', 'xz', 'zst', 'iso', 'img', 'dmg'],
+        };
+        const kind = Object.keys(kinds).find((k) => kinds[k].includes(last)) || 'File';
+        const size = (metaEl.dataset.size || '').replace(/^(\d+) Bytes$/, '$1 B').replace(/\.0 /, ' ');
+        metaEl.textContent = `${kind}, ${size}`;
+      }
+    }
+
+    const showExpired = () => {
+      if (!card || card.hidden) return;
+      card.hidden = true;
+      if (expiredCard) {
+        expiredCard.hidden = false;
+        const h = expiredCard.querySelector('h1');
+        if (h) h.focus();
+      }
+    };
+
+    if (!isNaN(expiresAt)) {
+      try {
+        const d = new Date(expiresAt);
+        const sameDay = d.toDateString() === new Date().toDateString();
+        atEl.textContent = sameDay
+          ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      } catch (_) {}
+      const tick = () => {
+        const sec = Math.floor((expiresAt - Date.now()) / 1000);
+        if (sec <= 0) { showExpired(); return; }
+        const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+        cdEl.textContent = h > 0 ? `${h} h ${m} min` : (m >= 5 ? `${m} minutes` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+        cdWrap.hidden = false;
+        setTimeout(tick, 1000);
+      };
+      tick();
+    }
+
+    // Check the link before handing the download to the browser, so a dead link or a missing file
+    // shows a message here instead of an error document.
+    if (dl) {
+      dl.addEventListener('click', async (e) => {
+        if (dl.dataset.checked === '1') { dl.dataset.checked = ''; return; }
+        e.preventDefault();
+        dlErr.hidden = true;
+        dl.setAttribute('aria-busy', 'true');
+        try {
+          const res = await fetch(dl.href, { method: 'HEAD', cache: 'no-store' });
+          if (res.status === 410) { showExpired(); return; }
+          if (res.status === 404) { dlErr.textContent = 'This file is no longer available. Ask the person who sent the link to share it again.'; dlErr.hidden = false; return; }
+          if (res.status === 429) { dlErr.textContent = 'Too many downloads right now. Wait a moment and try again.'; dlErr.hidden = false; return; }
+          if (!res.ok) { dlErr.textContent = 'The download could not start. Try again.'; dlErr.hidden = false; return; }
+          dl.dataset.checked = '1';
+          dl.click();
+        } catch (_) {
+          dlErr.textContent = "Couldn't reach HAMAL. Check your connection and try again.";
+          dlErr.hidden = false;
+        } finally {
+          dl.removeAttribute('aria-busy');
+        }
+      });
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // 2. Room Management (Creator & Participant Views)
   // --------------------------------------------------------------------------
   const page = document.body.dataset.page;

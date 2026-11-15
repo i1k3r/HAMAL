@@ -148,11 +148,16 @@ test.describe('Light Table', () => {
     const room = await createRoom();
     await mustUpload(room, 'a'.repeat(120) + '.txt', 'x');
     await mustPostText(room, 'b'.repeat(400));
-    for (const url of [`${room.base}/c/${room.creator_token}`, `${room.base}/r/${room.participant_token}`]) {
-      await page.goto(url);
-      await waitForPolls(page, 1);
-      const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-      expect(over, url).toBeLessThanOrEqual(0);
+    // Both views: phones open in List by default, so Table is checked explicitly too.
+    for (const view of ['list', 'table']) {
+      await page.goto(`${room.base}/`);
+      await page.evaluate((v) => localStorage.setItem('hamal_view', v), view);
+      for (const url of [`${room.base}/c/${room.creator_token}`, `${room.base}/r/${room.participant_token}`]) {
+        await page.goto(url);
+        await waitForPolls(page, 1);
+        const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+        expect(over, `${view} ${url}`).toBeLessThanOrEqual(0);
+      }
     }
   });
 

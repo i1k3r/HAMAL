@@ -79,4 +79,21 @@ test.describe('home: open a room', () => {
     await page.waitForURL(/\/c\/c_/);
     await expect(page.locator('body')).toHaveAttribute('data-pin-required', 'true');
   });
+
+  test('every entry screen has exactly one primary action, in the same safelight colour', async ({ page }) => {
+    const { createRoom } = await import('./support/api');
+    const room = await createRoom({ pin: '2468' });
+    const SAFELIGHT = 'rgb(255, 106, 85)';
+    const screens: [string, string][] = [
+      [`${PRIMARY_URL}/`, '#create-submit-btn'],
+      [`${room.base}/r/${room.participant_token}`, '#unlock-btn'],
+    ];
+    for (const [url, id] of screens) {
+      await page.goto(url);
+      const primaries = page.locator('.lt-btn-primary:visible');
+      await expect(primaries, url).toHaveCount(1);
+      await expect(primaries.first()).toHaveAttribute('id', id.slice(1));
+      expect(await page.locator(id).evaluate((n) => getComputedStyle(n).backgroundColor)).toBe(SAFELIGHT);
+    }
+  });
 });

@@ -132,4 +132,21 @@ test.describe('visual baselines', () => {
       mask: [page.locator('#countdown'), page.locator('a[href*="/s/"]')],
     });
   });
+
+  test('share page, link no longer works', async ({ page }) => {
+    const room = await createRoom({ base: LIMITED_URL });
+    const file = await mustUpload(room, 'handout.pdf', 'x'.repeat(2048));
+    const res = await fetch(`${room.base}/api/v1/rooms/${room.creator_token}/files/${file.file_id}/share`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ttl_seconds: 3600 }),
+    });
+    const share = await res.json();
+    await fetch(`${room.base}/api/v1/rooms/${room.creator_token}/close`, { method: 'POST' });
+    const page410 = await page.goto(share.share_url);
+    expect(page410?.status()).toBe(410);
+    await page.evaluate(() => document.fonts.ready);
+    await expect(page).toHaveScreenshot('share-gone.png', { fullPage: true });
+  });
 });
+
