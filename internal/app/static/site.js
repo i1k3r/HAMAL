@@ -264,10 +264,15 @@
     }
 
     // Check the link before handing the download to the browser, so a dead link or a missing file
-    // shows a message here instead of an error document.
+    // shows a message here instead of an error document. Loading this page has just validated the
+    // link, so within the first 30 s the check would tell us nothing new: the browser downloads
+    // directly and the visit costs the same two rate-limited requests as before (page + file).
+    const loadedAt = performance.now();
+    const FRESH_MS = 30000;
     if (dl) {
       dl.addEventListener('click', async (e) => {
         if (dl.dataset.checked === '1') { dl.dataset.checked = ''; return; }
+        if (performance.now() - loadedAt < FRESH_MS) return;
         e.preventDefault();
         dlErr.hidden = true;
         dl.setAttribute('aria-busy', 'true');

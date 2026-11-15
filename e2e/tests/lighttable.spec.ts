@@ -197,4 +197,28 @@ test.describe('Light Table', () => {
     const color = await page.locator('#text-input').evaluate((n) => getComputedStyle(n).color);
     expect(color).toBe('rgb(31, 27, 25)');
   });
+
+  test('viewer Save right after a poll downloads with one request; a stale room checks first', async ({ page }) => {
+    const room = await createRoom();
+    await mustUpload(room, 'photo.png', PNG_1PX, { type: 'image/png' });
+    await page.clock.install();
+    await page.goto(`${room.base}/c/${room.creator_token}`);
+    await expect(page.getByRole('button', { name: 'View photo.png' })).toBeVisible();
+    const methods: string[] = [];
+    page.on('request', (r) => { if (/\/files\/[^/?]+$/.test(new URL(r.url()).pathname)) methods.push(r.method()); });
+
+    await page.getByRole('button', { name: 'View photo.png' }).click();
+    methods.length = 0; // the viewer's own image load
+    let [download] = await Promise.all([page.waitForEvent('download'), page.locator('#viewer-save').click()]);
+    expect(download.suggestedFilename()).toBe('photo.png');
+    expect(methods.filter((m) => m === 'HEAD')).toEqual([]);
+
+    // Polling stops confirming the file (server errors), and the confirmation goes stale.
+    await page.route('**/api/v1/rooms/*/files', (r) => r.fulfill({ status: 500, body: 'x' }));
+    await page.clock.fastForward(11_000);
+    methods.length = 0;
+    [download] = await Promise.all([page.waitForEvent('download'), page.locator('#viewer-save').click()]);
+    expect(download.suggestedFilename()).toBe('photo.png');
+    expect(methods[0]).toBe('HEAD');
+  });
 });

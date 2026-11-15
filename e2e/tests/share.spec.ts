@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import { test, expect } from './support/fixtures';
 import { createRoom, mustUpload, LIMITED_URL } from './support/api';
 import { waitForPolls } from './support/page';
@@ -87,7 +88,9 @@ test.describe('share links', () => {
     expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize()!.height);
   });
 
-  test('Download checks the link first, then downloads the file', async ({ page }) => {
+  test('right after the page loads, Download costs one request (no extra check)', async ({ page }) => {
+    // The page load has just validated the link, so the download goes straight to the browser:
+    // a visit costs two rate-limited requests (page + file), as before the redesign.
     const room = await createRoom({ base: LIMITED_URL });
     const file = await mustUpload(room, 'handout.txt', 'shared content');
     const share = await (await page.request.post(`${room.base}/api/v1/rooms/${room.creator_token}/files/${file.file_id}/share`, { data: { ttl_seconds: 3600 } })).json();
@@ -96,15 +99,34 @@ test.describe('share links', () => {
     page.on('request', (r) => { if (r.url().endsWith('/download')) methods.push(r.method()); });
     const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#share-download-btn').click()]);
     expect(download.suggestedFilename()).toBe('handout.txt');
-    expect(methods[0]).toBe('HEAD');
+    expect(fs.readFileSync(await download.path(), 'utf8')).toBe('shared content');
+    // (Chromium doesn't report the download navigation itself as a page request; the check is a fetch and would be.)
+    expect(methods).not.toContain('HEAD');
     await expect(page.locator('#share-download-error')).toBeHidden();
+  });
+
+  test('when the page has been open a while, Download checks the link first, then downloads', async ({ page }) => {
+    const room = await createRoom({ base: LIMITED_URL });
+    const file = await mustUpload(room, 'handout.txt', 'shared content');
+    const share = await (await page.request.post(`${room.base}/api/v1/rooms/${room.creator_token}/files/${file.file_id}/share`, { data: { ttl_seconds: 3600 } })).json();
+    await page.clock.install();
+    await page.goto(share.share_url);
+    await page.clock.fastForward(31_000);
+    const methods: string[] = [];
+    page.on('request', (r) => { if (r.url().endsWith('/download')) methods.push(r.method()); });
+    const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#share-download-btn').click()]);
+    expect(download.suggestedFilename()).toBe('handout.txt');
+    expect(methods[0]).toBe('HEAD');
   });
 
   test('a file that is gone, or a link that died, says so on the page instead of showing an error document', async ({ page }) => {
     const room = await createRoom({ base: LIMITED_URL });
     const file = await mustUpload(room, 'gone.txt', 'x');
     const share = await (await page.request.post(`${room.base}/api/v1/rooms/${room.creator_token}/files/${file.file_id}/share`, { data: { ttl_seconds: 3600 } })).json();
+    // The check runs once the page is no longer fresh (open for more than 30 s).
+    await page.clock.install();
     await page.goto(share.share_url);
+    await page.clock.fastForward(31_000);
     await page.route('**/download', (r) => r.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"file not found"}' }));
     await page.locator('#share-download-btn').click();
     await expect(page.locator('#share-download-error')).toHaveText(/This file is no longer available/);

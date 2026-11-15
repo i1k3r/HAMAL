@@ -202,6 +202,7 @@
     lastBodies: { room: '', files: '', texts: '' },
     deadline: 0,
     ttl: 0,
+    filesConfirmedAt: 0,
     seenSeats: new Set(),
     seatsInitialised: false,
   };
@@ -878,13 +879,19 @@
       if (!ok) { const pre = vBody.querySelector('pre'); if (pre) { const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r); } }
       return;
     }
-    try {
-      const res = await fetch(fileURL(it.id), { method: 'HEAD', cache: 'no-store' });
-      if (res.status === 410) { endRoom('gone'); return; }
-      if (!res.ok) { note.textContent = 'This file is no longer in the room.'; return; }
-    } catch (_) {
-      note.textContent = "Couldn't reach HAMAL. Check your connection and try again.";
-      return;
+    // The poll confirms every few seconds that the file is in the room. Only when that is stale
+    // (polling stalled, tab in the background) is the file checked first, so a normal Save costs one
+    // rate-limited request instead of two.
+    const fresh = state.filesConfirmedAt && performance.now() - state.filesConfirmedAt < 10000 && state.files.some((f) => f.file_id === it.id);
+    if (!fresh) {
+      try {
+        const res = await fetch(fileURL(it.id), { method: 'HEAD', cache: 'no-store' });
+        if (res.status === 410) { endRoom('gone'); return; }
+        if (!res.ok) { note.textContent = 'This file is no longer in the room.'; return; }
+      } catch (_) {
+        note.textContent = "Couldn't reach HAMAL. Check your connection and try again.";
+        return;
+      }
     }
     const a = el('a', { href: fileURL(it.id), download: it.name });
     document.body.appendChild(a); a.click(); a.remove();
@@ -1484,6 +1491,7 @@
     const res = await fetch(`${API}/files`, { cache: 'no-store' });
     if (res.status === 404 || res.status === 410) { endRoom('gone'); return false; }
     if (!res.ok) return true;
+    state.filesConfirmedAt = performance.now();
     const text = await res.text();
     if (text === state.lastBodies.files) return true;
     state.lastBodies.files = text;
