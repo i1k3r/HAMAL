@@ -460,6 +460,8 @@ html[data-theme="light"] body.lt .lt-table { box-shadow: 0 0 0 10px var(--frame-
   position: relative;
 }
 .lt-print-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lt-print-media.is-missing { background: var(--slip); color: var(--ink); display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 6px; padding: 16px; text-align: start; }
+.lt-missing-note { font-size: 13px; color: var(--ink-muted); }
 .lt-print-media.is-video {
   aspect-ratio: 16 / 9;
   background: var(--video-tile);
@@ -502,7 +504,7 @@ html[data-theme="light"] body.lt .lt-table { box-shadow: 0 0 0 10px var(--frame-
 }
 .lt-card::before { content: ""; position: absolute; inset-inline-start: 28px; top: 0; bottom: 0; width: 1px; background: var(--card-margin); }
 .lt-card-head { display: flex; align-items: center; gap: 8px; min-height: 40px; }
-.lt-card-who { font-size: 13px; color: var(--ink-muted); flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lt-card-who { font-size: 13px; line-height: 1.3; color: var(--ink-muted); flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .lt-card-who b { color: var(--ink); font-weight: 700; }
 .lt-card-body {
   margin: 0;
@@ -947,7 +949,7 @@ html[data-theme="light"] body.lt .lt-qr { background: #0E0605; color: #F4E7E3; -
   .lt-search { order: 1; }
   .lt-kind-select, .lt-sort { order: 3; }
   .lt-table {
-    margin: 0 10px;
+    margin: 16px 10px 0;
     border-radius: 22px 22px 0 0;
     box-shadow: none;
     min-height: 60vh;
@@ -988,6 +990,10 @@ html[data-theme="light"] body.lt .lt-qr { background: #0E0605; color: #F4E7E3; -
     box-shadow: 0 -24px 60px rgba(0, 0, 0, 0.55);
   }
   .lt-composer-backdrop { position: fixed; inset: 0; z-index: 49; background: rgba(14, 6, 5, 0.6); }
+  .lt-composer-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+  .lt-composer-row > .lt-counter, .lt-composer-row > .lt-hint { grid-column: 1 / -1; }
+  .lt-composer-row > .lt-spacer { display: none; }
+  .lt-composer-row > .lt-btn { min-height: 54px; font-size: 16px; }
   .lt-tray {
     inset-inline-end: 10px;
     left: 10px;

@@ -169,4 +169,17 @@ test.describe('Light Table', () => {
     await expect(page.locator('#shortcuts-dialog')).toBeVisible();
     await expect(page.locator('#shortcuts-dialog')).toContainText('HAMAL v0.8.14');
   });
+
+  test('a photo that cannot be loaded shows what it is instead of a broken image', async ({ page }) => {
+    const room = await createRoom();
+    const f = await mustUpload(room, 'gone.jpg', PNG_1PX, { type: 'image/jpeg' });
+    await page.route(`**/files/${f.file_id}`, (route) => route.fulfill({ status: 404, body: 'not found' }));
+    await page.goto(`${room.base}/c/${room.creator_token}`);
+    const media = page.locator('#file-list .file-row', { hasText: 'gone.jpg' }).locator('.lt-print-media');
+    await expect(media).toHaveClass(/is-missing/);
+    await expect(media).toContainText('Preview unavailable');
+    await expect(media.locator('img')).toHaveCount(0);
+    // The file itself is still listed with its actions.
+    await expect(page.getByRole('button', { name: 'View gone.jpg' })).toBeVisible();
+  });
 });

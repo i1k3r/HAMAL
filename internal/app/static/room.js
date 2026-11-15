@@ -375,9 +375,14 @@
     const li = el('li', { class: 'lt-item file-row', dataset: { key: it.key, fileId: it.id, kind: it.kind } });
     const big = it.kind === 'image' && it.size > BIG_IMAGE;
     if (it.kind === 'image' && it.preview === 'image' && !big) {
-      const media = el('button', { type: 'button', class: 'lt-print-media', dataset: { action: 'view' }, 'aria-hidden': 'true', tabindex: '-1' }, [
-        el('img', { src: fileURL(it.id), alt: it.name, loading: 'lazy', decoding: 'async' }),
-      ]);
+      const img = el('img', { src: fileURL(it.id), alt: it.name, loading: 'lazy', decoding: 'async' });
+      const media = el('button', { type: 'button', class: 'lt-print-media', dataset: { action: 'view' }, 'aria-hidden': 'true', tabindex: '-1' }, [img]);
+      // If the picture can't be loaded (removed meanwhile, unreadable format), show what it is
+      // instead of the browser's broken-image icon.
+      img.addEventListener('error', () => {
+        media.classList.add('is-missing');
+        media.replaceChildren(el('span', { class: 'lt-slip-ext', text: extOf(it.name).toUpperCase() || 'IMAGE' }), el('span', { class: 'lt-missing-note', text: 'Preview unavailable' }));
+      }, { once: true });
       li.appendChild(el('article', { class: 'lt-print' }, [media, el('div', { class: 'lt-item-foot' }, [nameBlock(it), fileActions(it)])]));
     } else if (it.kind === 'video') {
       const tile = el('button', { type: 'button', class: 'lt-print-media is-video', dataset: { action: it.preview ? 'view' : 'save-direct' }, 'aria-hidden': 'true', tabindex: '-1' }, [svg(ICON_PLAY)]);
@@ -452,8 +457,12 @@
     }
     row.appendChild(sel);
     let thumb;
-    if (it.kind === 'image' && it.preview === 'image' && it.size <= BIG_IMAGE) thumb = el('img', { class: 'lt-row-thumb', src: fileURL(it.id), alt: '', loading: 'lazy', decoding: 'async' });
-    else thumb = el('span', { class: 'lt-row-tag' + (isNote ? ' is-note' : '') + (it.kind === 'video' ? ' is-video' : ''), 'aria-hidden': 'true', text: isNote ? '' : (extOf(it.name).toUpperCase().slice(0, 6) || '—') });
+    if (it.kind === 'image' && it.preview === 'image' && it.size <= BIG_IMAGE) {
+      thumb = el('img', { class: 'lt-row-thumb', src: fileURL(it.id), alt: '', loading: 'lazy', decoding: 'async' });
+      const tag = el('span', { class: 'lt-row-tag', 'aria-hidden': 'true', text: extOf(it.name).toUpperCase().slice(0, 6) });
+      thumb.addEventListener('error', () => thumb.replaceWith(tag), { once: true });
+    }
+    else if (!thumb) thumb = el('span', { class: 'lt-row-tag' + (isNote ? ' is-note' : '') + (it.kind === 'video' ? ' is-video' : ''), 'aria-hidden': 'true', text: isNote ? '' : (extOf(it.name).toUpperCase().slice(0, 6) || '—') });
     const nameCell = el('span', { class: 'lt-row-name' }, [thumb]);
     if (isNote) nameCell.appendChild(el('span', { class: 'lt-row-note text-item-content', dir: 'auto', title: it.raw.content, text: it.raw.content }));
     else nameCell.appendChild(el('h3', { class: 'lt-item-name', dir: 'auto', text: it.name }));
@@ -1397,7 +1406,7 @@
   function serverLogText(t) {
     const c = (t.content || '').trim();
     let m;
-    if (/^room created$/i.test(c)) return 'Room opened';
+    if (/^room created\b/i.test(c)) return 'Room opened';
     if ((m = /^file uploaded:\s*(.+)$/i.exec(c))) return `${m[1]} laid on the table`;
     return c;
   }
@@ -1699,7 +1708,7 @@
       const digits = pinInput.value.replace(/[^0-9]/g, '');
       if (digits !== pinInput.value) pinInput.value = digits;
     });
-    if (!$('pin-barrier-card').hidden) setTimeout(() => pinInput.focus(), 100);
+    if (!$('pin-barrier-card').hidden) pinInput.focus();
     if (body.dataset.isLocked === 'true') lockout(parseInt(body.dataset.retryAfter || '30', 10) || 30);
   }
   pinForm?.addEventListener('submit', async (e) => {

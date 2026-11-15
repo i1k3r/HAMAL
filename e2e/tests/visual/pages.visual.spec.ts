@@ -77,13 +77,17 @@ test.describe('visual baselines', () => {
     await expect(page).toHaveScreenshot('creator-files.png', { fullPage: true, mask: masks(page) });
   });
 
-  test('creator, text tab', async ({ page }) => {
+  test('creator, writing a note', async ({ page }) => {
+    // The Light Table pages have no separate Text tab: notes lie on the table with the files, and
+    // "Write a note" opens the composer (inline on desktop, a bottom sheet on phones).
     const room = await createRoom();
     await mockRoomApi(page, { creator: true });
     await page.goto(`${room.base}/c/${room.creator_token}`);
     await settle(page);
-    await page.locator('#tab-text').click();
-    await expect(page).toHaveScreenshot('creator-text.png', { fullPage: true, mask: masks(page) });
+    await page.locator('#write-note-btn').click();
+    await expect(page.locator('#composer')).toBeVisible();
+    await page.locator('#text-input').blur();
+    await expect(page).toHaveScreenshot('creator-note.png', { fullPage: true, mask: masks(page) });
   });
 
   test('participant, files tab', async ({ page }) => {
