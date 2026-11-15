@@ -184,7 +184,7 @@ jobs:
         working-directory: e2e
         run: |
           if [ "${{ steps.baselines.outputs.mode }}" = "update" ]; then
-            npx playwright test --project=visual-desktop --project=visual-phone --update-snapshots --retries=0 --workers=1
+            npx playwright test --project=visual-desktop --project=visual-phone --update-snapshots=all --retries=0 --workers=1
           else
             npx playwright test --project=visual-desktop --project=visual-phone --retries=0 --workers=1
           fi
