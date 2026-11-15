@@ -121,8 +121,11 @@
       }
 
       if (createBtn) {
+        // Remember the button's own label so an error restores exactly what the page rendered.
+        if (!createBtn.dataset.label) createBtn.dataset.label = createBtn.innerHTML;
         createBtn.disabled = true;
-        createBtn.innerHTML = '<span>Creating room…</span>';
+        createBtn.setAttribute('aria-busy', 'true');
+        createBtn.innerHTML = '<span>Opening the room…</span>';
       }
       if (formError) formError.style.display = 'none';
 
@@ -146,24 +149,15 @@
         }
       } catch (err) {
         if (formError) {
-          formError.textContent = err.message;
+          formError.textContent = err instanceof TypeError
+            ? "Couldn't reach HAMAL. Check your connection and try again."
+            : (err.message || 'The room could not be opened. Try again.');
           formError.style.display = 'block';
         }
         if (createBtn) {
           createBtn.disabled = false;
-          createBtn.innerHTML = `
-            <span class="btn-icon-circle">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-            </span>
-            <span class="btn-text">Create Transfer Room</span>
-            <svg class="btn-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-              <polyline points="12 5 19 12 12 19"></polyline>
-            </svg>
-          `;
+          createBtn.removeAttribute('aria-busy');
+          if (createBtn.dataset.label) createBtn.innerHTML = createBtn.dataset.label;
         }
       }
     });

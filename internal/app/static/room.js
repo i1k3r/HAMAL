@@ -1268,6 +1268,8 @@
         textInput.value = '';
         updateCounter();
         logActivity('You wrote a note');
+        // On phones the composer is a sheet over the table: close it so the new note is visible.
+        if (isNarrow()) closeComposer();
         await fetchTexts();
         const mine = state.texts.filter((t) => t.is_self).pop();
         const rec = mine && records.get('t:' + mine.id);

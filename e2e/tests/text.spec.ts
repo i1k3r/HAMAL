@@ -15,6 +15,8 @@ test.describe('text notes', () => {
     await phone.locator('#text-input').fill('first from phone');
     await phone.locator('#send-text-btn').click();
     await expect(phone.locator('#text-input')).toHaveValue('');
+    // On phones the composer sheet closes after sending; open it again for the second note.
+    if (!(await phone.locator('#composer').isVisible())) await phone.locator('#write-note-btn').click();
     await phone.locator('#text-input').fill('second from phone');
     await phone.locator('#send-text-btn').click();
 

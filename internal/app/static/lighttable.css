@@ -1039,3 +1039,105 @@ html[data-theme="light"] body.lt .lt-qr { background: #0E0605; color: #F4E7E3; -
   .lt-print, .lt-slip, .lt-card, .lt-up, .lt-sheet, .lt-gate-card { border: 1px solid CanvasText; }
   .lt-lamp-fill, .lt-up-bar { background: Highlight; }
 }
+
+/* ------------------------------------------------------------------------------------------ */
+/* Home: opening a room                                                                        */
+/* ------------------------------------------------------------------------------------------ */
+
+body.lt .hidden { display: none !important; }
+.lt-home .lt-gate { gap: 24px; }
+.lt-home-stage {
+  width: min(1040px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 460px);
+  align-items: center;
+  gap: 48px 64px;
+}
+.lt-home-intro h1 {
+  margin: 0 0 18px;
+  font-size: clamp(38px, 5.4vw, 68px);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  color: var(--frame-text);
+}
+.lt-home-intro p { margin: 0; max-width: 46ch; font-size: 18px; line-height: 1.5; color: var(--frame-muted); }
+.lt-home-card { width: 100%; gap: 18px; }
+.lt-home-card h2 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+.lt-field { display: flex; flex-direction: column; gap: 8px; }
+.lt-field label { font-weight: 700; font-size: 15px; color: var(--ink); }
+.lt-field-opt { font-weight: 500; color: var(--ink-muted); }
+.lt-field-help { font-size: 14px; color: var(--ink-muted); line-height: 1.4; }
+.lt-home-select, .lt-home-input {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 14px;
+  border: 2px solid var(--ink);
+  background: #FFFFFF;
+  color: var(--ink);
+  padding: 10px 14px;
+  font-size: 16px;
+}
+.lt-home-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-inline-end: 40px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%), linear-gradient(135deg, var(--ink) 50%, transparent 50%);
+  background-position: calc(100% - 22px) 52%, calc(100% - 16px) 52%;
+  background-size: 6px 6px;
+  background-repeat: no-repeat;
+}
+.lt-home-input { font-family: var(--font-note); font-size: 20px; font-weight: 700; letter-spacing: 0.2em; }
+.lt-home-input::placeholder { font-family: var(--font-ui); font-size: 16px; font-weight: 500; letter-spacing: 0; color: var(--ink-muted); }
+.lt-home-select:focus-visible, .lt-home-input:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.lt-pinrow { display: flex; gap: 8px; align-items: stretch; }
+.lt-pinrow .lt-home-input { flex: 1 1 auto; min-width: 0; }
+.lt-pin-eye { width: 52px; min-height: 52px; padding: 0; border-radius: 14px; flex: 0 0 auto; }
+.lt-home-card .lt-btn-primary { width: 100%; min-height: 56px; font-size: 17px; background: var(--safelight); color: var(--safelight-ink); }
+.lt-home-card .lt-btn-primary[aria-busy="true"] { opacity: 0.75; cursor: progress; }
+.lt-home-facts {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  width: min(1040px, 100%);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px 28px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--frame-muted);
+}
+.lt-home-facts b { color: var(--frame-text); font-weight: 700; }
+.lt-sheet-head { display: flex; align-items: center; gap: 12px; }
+.lt-sheet-head h2 { flex: 1 1 auto; }
+.lt-sheet-head .lt-ink-btn { width: 40px; padding: 0; }
+.lt-sheet a { color: var(--ink); font-weight: 700; }
+
+@media (max-width: 860px) {
+  /* Headline, then the form, then the explanation: the primary action stays in the first screen. */
+  .lt-home-stage { grid-template-columns: 1fr; gap: 18px; }
+  .lt-home-intro { display: contents; }
+  .lt-home-intro h1 { order: 1; font-size: 34px; margin: 0; padding: 0 6px; }
+  .lt-home-card { order: 2; }
+  .lt-home-intro p { order: 3; font-size: 16px; padding: 0 6px; }
+  .lt-home-facts { grid-template-columns: 1fr; gap: 10px; padding: 0 6px; }
+}
+@media (max-width: 760px) {
+  .lt-home .lt-top { padding: 0 6px; }
+  .lt-home .lt-top-actions, .lt-home .lt-theme { display: flex; }
+  .lt-home .lt-gate-stage { align-items: flex-start; }
+  .lt-home #nav-btn-about { min-height: 40px; padding: 8px 14px; }
+}
+
+@media (max-width: 760px) {
+  .lt-home .lt-gate { gap: 14px; }
+  .lt-home-card { padding: 22px 18px 20px; gap: 14px; }
+  .lt-home-card h2 { font-size: 24px; }
+  .lt-home-select, .lt-home-input, .lt-pin-eye { min-height: 48px; }
+  .lt-pin-eye { width: 48px; }
+  .lt-field-help { font-size: 13px; }
+}
+@media (max-height: 680px) and (max-width: 760px) {
+  .lt-home-card h2 { display: none; }
+  .lt-home-intro h1 { font-size: 28px; }
+}

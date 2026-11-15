@@ -86,7 +86,8 @@ test.describe('poll stability', () => {
     await expect(page.locator('#file-list .text-item-card').first()).toContainText('note 31 from this phone');
     await page.waitForTimeout(200);
 
-    await page.locator('#composer-cancel').click();
+    // On a phone the composer sheet closes by itself after sending.
+    await expect(page.locator('#composer')).toBeHidden();
     {
       const afterSend = await firstVisible(page, '#file-list .text-item-card', '.text-item-content');
       expect(afterSend?.label, 'the note just sent is visible after sending').toContain(

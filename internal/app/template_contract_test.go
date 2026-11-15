@@ -101,9 +101,6 @@ var siteJSIDContract = []struct {
 	{"modal-file-id", []string{"creator-sharing"}},
 	{"modal-file-subtitle", []string{"creator-sharing"}},
 	{"nav-btn-about", []string{"home"}},
-	{"nav-btn-files", []string{"home"}},
-	{"nav-btn-room", []string{"home"}},
-	{"nav-file-count", []string{"home"}},
 	{"no-match", []string{"creator", "creator-sharing", "participant", "participant-pin-authenticated", "participant-pin-locked"}},
 	{"participant-count", []string{"creator", "creator-sharing"}},
 	{"participant-count-val", []string{"participant", "participant-pin-authenticated", "participant-pin-locked"}},
@@ -179,6 +176,9 @@ var siteJSIDContract = []struct {
 // fallbacks, elements created at runtime, and ids of the legacy room UI that the Light Table room
 // pages replaced (site.js returns before that code on body.lt pages).
 var siteJSIDsNotInTemplates = map[string]string{
+	"nav-file-count":            "old sidebar navigation; the Light Table home page has none, and only the legacy room code reads it",
+	"nav-btn-room":              "old sidebar navigation; the Light Table home page has none, and only the legacy room code reads it",
+	"nav-btn-files":             "old sidebar navigation; the Light Table home page has none, and only the legacy room code reads it",
 	"btn-copy-all-participants": "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",
 	"card-inactive":             "fallback for room-inactive-card; null-guarded",
 	"closing-ring-fill":         "read only by the legacy room code in site.js, which stops on Light Table room pages (body.lt)",

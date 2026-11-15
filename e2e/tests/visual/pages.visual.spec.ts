@@ -69,6 +69,16 @@ test.describe('visual baselines', () => {
     await expect(page).toHaveScreenshot('home.png', { fullPage: true });
   });
 
+  test('home, invalid PIN', async ({ page }) => {
+    await page.goto(`${PRIMARY_URL}/`);
+    await page.evaluate(() => document.fonts.ready);
+    await page.locator('#pin-input').fill('12');
+    await page.locator('#create-submit-btn').click();
+    await expect(page.locator('#form-error')).toBeVisible();
+    await page.locator('#pin-input').blur();
+    await expect(page).toHaveScreenshot('home-invalid-pin.png', { fullPage: true });
+  });
+
   test('creator, files tab', async ({ page }) => {
     const room = await createRoom();
     await mockRoomApi(page, { creator: true });
