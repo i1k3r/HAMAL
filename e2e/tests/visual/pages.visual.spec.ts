@@ -129,7 +129,8 @@ test.describe('visual baselines', () => {
     await page.evaluate(() => document.fonts.ready);
     await expect(page).toHaveScreenshot('share.png', {
       fullPage: true,
-      mask: [page.locator('#countdown'), page.locator('a[href*="/s/"]')],
+      // Only the clock-dependent parts; the Download button must stay visible to the comparison.
+      mask: [page.locator('#countdown'), page.locator('#share-expires-at')],
     });
   });
 

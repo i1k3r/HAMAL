@@ -1175,6 +1175,10 @@ body.lt .hidden { display: none !important; }
   .lt-share .lt-top { padding: 0 6px; }
   .lt-share .lt-theme { display: flex; }
   .lt-share-card { padding: 24px 18px 22px; }
+  /* The shared file is the page's subject: keep the stacked slip, not the room's compact row. */
+  .lt-share-card .lt-share-slip { flex-direction: column; flex-wrap: nowrap; align-items: stretch; border-radius: 6px 6px 6px 22px; background: linear-gradient(to top, var(--slip) 0 66%, var(--slip-top) 66% 100%); }
+  .lt-share-card .lt-share-slip .lt-slip-hole { display: block; }
+  .lt-share-card .lt-share-slip .lt-slip-ext { font-size: 34px; margin: 4px 0 6px; }
   .lt-share-card h1 { font-size: 28px; }
   .lt-share-card .lt-share-name { font-size: 20px; }
 }
