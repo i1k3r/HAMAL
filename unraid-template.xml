@@ -2,6 +2,7 @@
 <Container version="2">
   <Name>HAMAL</Name>
   <Repository>ghcr.io/i1k3r/hamal:latest</Repository>
+  <Version>0.8.14</Version>
   <Registry>https://github.com/i1k3r/HAMAL/pkgs/container/hamal</Registry>
   <Network>bridge</Network>
   <Privileged>false</Privileged>
