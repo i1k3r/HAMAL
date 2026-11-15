@@ -36,28 +36,40 @@ HAMAL is built around short-lived transfer rooms rather than permanent storage. 
 
 ## Screenshots
 
-The current interface uses a dark, high-contrast visual language with warm amber accents and responsive layouts for desktop and mobile.
+Room pages use the **Light Table** design: a darkroom frame around a lit table, where photos lie as prints, documents and audio as manila slips, and notes as index cards. The lamp at the top shows how long the room has left. Screens below are captured from the running application with demo data.
 
 <div align="center">
 
-### Home / Create Room
-<img src="docs/screenshots/home_new.png" alt="HAMAL Create Room" width="900" />
+### Room — creator, desktop
+<img src="docs/screenshots/creator-desktop.jpg" alt="HAMAL creator view: files and notes on the lit table, lamp gauge, device chip, Show QR and Close room" width="900" />
 
 <br/><br/>
 
-### Creator Dashboard
-<img src="docs/screenshots/creator.jpg" alt="HAMAL Creator Dashboard" width="900" />
+### Inviting a device — QR projection
+<img src="docs/screenshots/qr-desktop.png" alt="HAMAL QR projection: a large QR code with the room address and a Copy address button" width="900" />
 
 <br/><br/>
 
-### Temporary Text / Clipboard
-<img src="docs/screenshots/creator_clipboard_messages.png" alt="HAMAL Temporary Text and Clipboard" width="900" />
+### Notes and the composer
+<img src="docs/screenshots/note-desktop.jpg" alt="HAMAL note composer open below the table, with notes shown as ruled index cards" width="900" />
 
 <br/><br/>
 
-### Client — Desktop
-<img src="docs/screenshots/participant_desktop_clipboard.png" alt="HAMAL Client Desktop" width="900" />
+### List view and media viewer
+<img src="docs/screenshots/list-desktop.jpg" alt="HAMAL List view: the same files and notes as rows with Select all and Save selected" width="440" />
+<img src="docs/screenshots/viewer-desktop.jpg" alt="HAMAL media viewer showing a photo with Previous, Save and Next" width="440" />
 
+<br/><br/>
+
+### Phone — joining with a PIN, the table, and the last two minutes
+<img src="docs/screenshots/pin-phone.jpg" alt="HAMAL PIN screen on a phone" width="250" />
+<img src="docs/screenshots/participant-phone.jpg" alt="HAMAL participant view on a phone with Add files and Write a note" width="250" />
+<img src="docs/screenshots/closing-phone.jpg" alt="HAMAL phone view in the last two minutes: warning banner and dimmed table" width="250" />
+
+<br/><br/>
+
+### Home — create a room
+<img src="docs/screenshots/home-desktop.jpg" alt="HAMAL home page with the Create Transfer Room form" width="900" />
 
 </div>
 
