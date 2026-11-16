@@ -10,7 +10,12 @@
   <Project>https://github.com/i1k3r/HAMAL</Project>
   <TemplateURL>https://raw.githubusercontent.com/i1k3r/HAMAL/main/unraid-template.xml</TemplateURL>
   <ReadMe>https://github.com/i1k3r/HAMAL#readme</ReadMe>
-  <Overview>HAMAL is a fast, lightweight, self-hosted file and text sharing server for your local network. Easily transfer files and share text between devices using a web browser — no client installation required. Designed for privacy, simplicity, and seamless LAN-based sharing. All data stays on your own server.</Overview>
+  <Overview>
+    HAMAL is a fast, lightweight, self-hosted file and text sharing server for your local network.[br][br]
+    Send files, photos, documents, and text between computers, phones, and tablets using a web browser. No client installation, cloud storage, or third-party account is required.[br][br]
+    Create a temporary sharing room, then let other devices join instantly by scanning its QR code or opening the room link. Optional PIN protection and automatic room expiration help keep every transfer private and temporary.[br][br]
+    HAMAL runs on your own Unraid server. Your files and shared text stay on your local network and are stored in your configured appdata directory.
+  </Overview>
   <Description>HAMAL is a lightweight, self-hosted file and text sharing server for your local network.
 
 Share files and text between your devices using nothing more than a web browser. No client installation, external cloud storage, or third-party account is required.
