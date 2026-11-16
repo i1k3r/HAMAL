@@ -18,4 +18,4 @@ COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 EXPOSE 7700
 VOLUME ["/data"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD ["/app/hamal", "healthcheck"]
-ENTRYPOINT ["/app/hamal"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
