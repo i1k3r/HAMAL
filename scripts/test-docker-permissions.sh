@@ -53,7 +53,9 @@ proc_id() { docker exec "$1" sh -c 'awk "/^Uid/{u=\$2} /^Gid/{g=\$2} END{print u
 has_id() { [ "$(proc_id "$1")" = "$2" ]; }
 exited_with() { # name text: container exited non-zero and its log contains text
     for _ in $(seq 1 15); do running "$1" || break; sleep 1; done
-    ! running "$1" && [ "$(docker inspect -f '{{.State.ExitCode}}' "$1")" != 0 ] && docker logs "$1" 2>&1 | grep -qF -- "$2"
+    local logs
+    logs=$(docker logs "$1" 2>&1) # not piped into grep -q: with pipefail, SIGPIPE would fail the check
+    ! running "$1" && [ "$(docker inspect -f '{{.State.ExitCode}}' "$1")" != 0 ] && grep -qF -- "$2" <<<"$logs"
 }
 start() { # name hostdir|volume [docker args...]
     local n=$PFX-$1 d=$2; shift 2
