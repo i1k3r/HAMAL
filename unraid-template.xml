@@ -33,13 +33,13 @@ Open the WebUI after installation. Create a room and connect another device on y
 
 DATA
 HAMAL stores its database, uploaded files, and server secrets in the configured /data directory. Keep the appdata mapping persistent to retain your data across container updates.</Description>
-  <Changes>2026-11-16 - Improved the Unraid Apps listing overview with clearer description and paragraph formatting. v0.8.14 - Security and reliability release: upload storage limits are now enforced correctly across concurrent uploads, small API requests are size-limited, only the room creator can close a room, PINs are 4-8 digits, participant details stay hidden until the PIN is entered, the upload queue reports errors and keeps going, shared text keeps its exact formatting, and fonts are bundled so pages make no third-party requests.</Changes>
+  <Changes>2026-11-16 - Improved the Unraid Apps listing overview with clearer description and paragraph formatting. Unraid appdata permissions are initialized automatically before HAMAL drops root privileges. v0.8.14 - Security and reliability release: upload storage limits are now enforced correctly across concurrent uploads, small API requests are size-limited, only the room creator can close a room, PINs are 4-8 digits, participant details stay hidden until the PIN is entered, the upload queue reports errors and keeps going, shared text keeps its exact formatting, and fonts are bundled so pages make no third-party requests.</Changes>
   <License>HAMAL Source-Available Organizational Use License</License>
   <ExtraSearchTerms>clipboard text transfer temporary sharing LAN file transfer local file transfer QR file transfer temporary clipboard</ExtraSearchTerms>
   <Category>Tools: Productivity: Network:Web</Category>
   <Icon>https://raw.githubusercontent.com/i1k3r/HAMAL/main/assets/hamal-icon.png</Icon>
   <WebUI>http://[IP]:[PORT:7700]</WebUI>
-  <ExtraParams>--read-only --tmpfs /tmp --security-opt no-new-privileges:true --user 99:100</ExtraParams>
+  <ExtraParams>--read-only --tmpfs /tmp --security-opt no-new-privileges:true</ExtraParams>
   <Networking>
     <Mode>bridge</Mode>
     <Publish>
@@ -65,6 +65,6 @@ HAMAL stores its database, uploaded files, and server secrets in the configured 
     </Variable>
   </Environment>
   <Config Name="WebUI Port" Target="7700" Default="7700" Mode="tcp" Description="Web interface port" Type="Port" Display="always" Required="true" Mask="false">7700</Config>
-  <Config Name="Appdata Storage" Target="/data" Default="/mnt/user/appdata/hamal" Mode="rw" Description="Persistent storage directory for SQLite database, uploaded files, and server secrets. The container runs as Unraid's standard UID:GID 99:100." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/hamal</Config>
+  <Config Name="Appdata Storage" Target="/data" Default="/mnt/user/appdata/hamal" Mode="rw" Description="Persistent storage directory for SQLite database, uploaded files, and server secrets. HAMAL automatically initializes appdata ownership for Unraid (99:100) when needed, then runs without root privileges." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/hamal</Config>
   <Config Name="Timezone" Target="TZ" Default="Europe/Istanbul" Description="Container timezone" Type="Variable" Display="always" Required="false" Mask="false">Europe/Istanbul</Config>
 </Container>
