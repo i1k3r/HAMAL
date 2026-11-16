@@ -139,6 +139,20 @@ Text messages are temporary and scoped to their room. They are removed with the 
 3. Select **HAMAL** from the template list.
 4. Set your preferred web UI port and appdata directory path (`/mnt/user/appdata/hamal`), then click **Apply**.
 
+No permission setup is needed. On first start, a new empty appdata folder is handed to Unraid's `nobody:users` (99:100); only that folder itself, never its contents.
+
+### Data folder permissions
+
+The container starts as root only to choose a non-root identity, then runs HAMAL (and its health check) without root, keeping `--read-only` and `no-new-privileges`:
+
+- **Existing data:** HAMAL runs as the owner of the data it finds (for example 10001:10001 from older images and named volumes, or 99:100 on Unraid). Existing files are never chowned.
+- **New, root-owned folder** (what Docker creates for a missing host path): only that directory is given to 99:100.
+- **`--user`:** if you start the container with `--user`, it runs as that user exactly as before.
+- **`PUID` / `PGID`** (optional): force a specific UID and/or GID. Each one replaces only its own half (PUID alone keeps the detected GID, PGID alone keeps the detected UID). Values must be whole numbers from 1 to 4294967294; 0 (root) is refused.
+- **`LAN_DROP_DATA_DIR` / `LAN_DROP_DB_PATH`** are honoured the same way as by the server. A missing data directory is created for the runtime user; the database's directory must already exist.
+
+If something is still not writable, the log lists each path with its owner and mode instead of a bare "permission denied".
+
 ---
 
 ### Manual Binary Build (Go)
@@ -170,6 +184,7 @@ HAMAL is configured via environment variables:
 | :--- | :--- | :--- |
 | `LAN_DROP_LISTEN_ADDR` | `:7700` | Address and port to bind the HTTP server |
 | `LAN_DROP_DATA_DIR` | `/data` | Root directory for SQLite DB, temporary files, and secrets |
+| `PUID` / `PGID` | *(auto)* | Docker image only, optional. UID / GID to run as (1–4294967294, each independent); by default the owner of existing data, or 99:100 for a new folder |
 | `LAN_DROP_DEFAULT_TTL` | `1h` | Default room lifetime |
 | `LAN_DROP_MIN_TTL` | `5m` | Minimum allowed room lifetime |
 | `LAN_DROP_MAX_TTL` | `24h` | Maximum allowed room lifetime |
