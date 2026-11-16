@@ -33,7 +33,7 @@ Open the WebUI after installation. Create a room and connect another device on y
 
 DATA
 HAMAL stores its database, uploaded files, and server secrets in the configured /data directory. Keep the appdata mapping persistent to retain your data across container updates.</Description>
-  <Changes>v0.8.14 - Security and reliability release: upload storage limits are now enforced correctly across concurrent uploads, small API requests are size-limited, only the room creator can close a room, PINs are 4-8 digits, participant details stay hidden until the PIN is entered, the upload queue reports errors and keeps going, shared text keeps its exact formatting, and fonts are bundled so pages make no third-party requests.</Changes>
+  <Changes>2026-11-16 - Improved the Unraid Apps listing overview with clearer description and paragraph formatting. v0.8.14 - Security and reliability release: upload storage limits are now enforced correctly across concurrent uploads, small API requests are size-limited, only the room creator can close a room, PINs are 4-8 digits, participant details stay hidden until the PIN is entered, the upload queue reports errors and keeps going, shared text keeps its exact formatting, and fonts are bundled so pages make no third-party requests.</Changes>
   <License>HAMAL Source-Available Organizational Use License</License>
   <ExtraSearchTerms>clipboard text transfer temporary sharing LAN file transfer local file transfer QR file transfer temporary clipboard</ExtraSearchTerms>
   <Category>Tools: Productivity: Network:Web</Category>
