@@ -1,0 +1,43 @@
+name: Docker image check
+
+# Builds the full Dockerfile and runs the data-permission regression tests
+# against the built image. Build-only: the image is loaded into the runner's
+# Docker and discarded. This workflow has no packages permission and never
+# logs in to a registry, so it cannot publish anything (publishing stays in
+# docker-publish.yml, which runs only on pushes to main and on tags).
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-image-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build image and test data permissions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (not pushed)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: hamal:ci-check
+          cache-from: type=gha
+
+      - name: Data permission regression tests
+        run: scripts/test-docker-permissions.sh hamal:ci-check
